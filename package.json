@@ -1,0 +1,60 @@
+{
+  "name": "dsh-bot-quotapot",
+  "version": "0.1.0",
+  "description": "QuotaPot: a floating DeepSeek API balance pill for DeepSeek Harness (DSH) and DS Bot, with low-balance warning and multi-currency support.",
+  "type": "module",
+  "main": "index.js",
+  "license": "MIT",
+  "author": "Caffrey-Li",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Caffrey-Li/dsh-bot-QuotaPot.git"
+  },
+  "homepage": "https://github.com/Caffrey-Li/dsh-bot-QuotaPot#readme",
+  "bugs": {
+    "url": "https://github.com/Caffrey-Li/dsh-bot-QuotaPot/issues"
+  },
+  "keywords": [
+    "deepseek",
+    "dsh",
+    "deepseek-harness",
+    "ds-bot",
+    "plugin",
+    "balance",
+    "quota",
+    "web-ui"
+  ],
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "files": [
+    "index.js",
+    "widget.js",
+    "cordis.patch.yml",
+    "README.md",
+    "README.en.md",
+    "LICENSE",
+    "docs/screenshot.png"
+  ],
+  "peerDependencies": {
+    "@deepseek-ai/cordis": ">=0.1.0-rc.5",
+    "@deepseek-ai/dsh": ">=0.2.0-rc.2 <0.3.0",
+    "@deepseek-ai/dsh-credentials": ">=0.1.0-rc.5",
+    "@deepseek-ai/dsh-host-webserver": ">=0.1.0-rc.5"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/cordis": { "optional": true },
+    "@deepseek-ai/dsh": { "optional": true },
+    "@deepseek-ai/dsh-credentials": { "optional": true },
+    "@deepseek-ai/dsh-host-webserver": { "optional": true }
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "scripts": {
+    "test": "node --test",
+    "check": "node --check index.js && node --check widget.js && node --test"
+  }
+}

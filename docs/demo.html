@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>QuotaPot demo</title>
+<style>
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: radial-gradient(1200px 600px at 80% 15%, #eef2ff 0%, #f7f8fc 45%, #eef1f7 100%);
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif;
+    color: #6e6e73;
+  }
+  .hint { position: fixed; left: 32px; top: 28px; font-size: 12px; letter-spacing: .3px; color: #8e8e93; }
+</style>
+</head>
+<body>
+<div class="hint">QuotaPot · DeepSeek 余额胶囊</div>
+<script>
+  window.__QUOTAPOT__ = {
+    token: 'demo',
+    version: '0.1.0',
+    config: { refreshSeconds: 30, lowBalanceThreshold: 5, position: 'bottom-right', locale: 'zh' }
+  }
+  const realFetch = window.fetch.bind(window)
+  window.fetch = (url, options) => {
+    if (String(url).startsWith('/quotapot/balance')) {
+      return Promise.resolve(new Response(JSON.stringify({
+        ok: true,
+        isAvailable: true,
+        balances: [{ currency: 'CNY', total: '34.21', toppedUp: '30.45', granted: '3.76' }],
+        updatedAt: Date.now()
+      }), { status: 200, headers: { 'content-type': 'application/json' } }))
+    }
+    return realFetch(url, options)
+  }
+</script>
+<script src="../widget.js"></script>
+<script>
+  setTimeout(() => {
+    const host = document.getElementById('quotapot-host')
+    host?.shadowRoot?.querySelector('.pill')?.click()
+  }, 900)
+</script>
+</body>
+</html>
