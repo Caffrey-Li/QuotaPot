@@ -6,6 +6,8 @@ QuotaPot 是一个 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-ha
 
 ![QuotaPot 截图](docs/screenshot.png)
 
+*界面示意，余额为示例数据。*
+
 ## 功能
 
 - **常驻显示**：余额胶囊固定在窗口角落，可拖动，位置会记住

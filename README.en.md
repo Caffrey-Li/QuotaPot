@@ -6,6 +6,8 @@ QuotaPot is a [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness
 
 ![QuotaPot screenshot](docs/screenshot.png)
 
+*Illustrative screenshot with sample data.*
+
 ## Features
 
 - **Always visible** — a draggable pill in a corner; its position is remembered
