@@ -41,7 +41,11 @@
     "docs/pet-closeup.png",
     "agents/mcp/server.cjs",
     "agents/mcp/core.cjs",
-    "agents/templates"
+    "agents/templates",
+    "docs/CONFIG.md",
+    "docs/CONFIG.en.md",
+    "docs/TROUBLESHOOTING.md",
+    "docs/TROUBLESHOOTING.en.md"
   ],
   "peerDependencies": {
     "@deepseek-ai/cordis": ">=0.1.0-rc.5",
