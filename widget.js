@@ -64,6 +64,28 @@
     other: zh ? '其他' : 'Other',
     viewUsage: zh ? '查看用量' : 'View usage',
     petTitle: zh ? '小鲸鱼：点我冲浪' : 'Whale: click to surf',
+    spaceTab: zh ? '空间' : 'Space',
+    updateFound: zh ? '发现新版本' : 'New version',
+    update: zh ? '更新' : 'Update',
+    updateConfirm: zh ? '确认更新' : 'Confirm update',
+    updating: zh ? '更新中…' : 'Updating…',
+    updateDone: zh ? '已安装，重启 DSH 生效' : 'Installed. Restart DSH.',
+    updateFailed: zh ? '更新失败' : 'Update failed',
+    scan: zh ? '扫描 AI 工具' : 'Scan AI tools',
+    scanning: zh ? '扫描中…' : 'Scanning…',
+    free: zh ? '可用' : 'Free',
+    aiTotal: zh ? 'AI 工具合计' : 'AI tools total',
+    safeTag: zh ? '可清理' : 'Safe',
+    readOnly: zh ? '只读' : 'Read-only',
+    cleanSelected: zh ? '清理选中' : 'Clean selected',
+    confirmClean: zh ? '确认清理' : 'Confirm clean',
+    cleaning: zh ? '清理中…' : 'Cleaning…',
+    freed: zh ? '已释放' : 'Freed',
+    cleanFailed: zh ? '清理失败' : 'Cleanup failed',
+    scanFailed: zh ? '扫描失败' : 'Scan failed',
+    noDisk: zh ? '未发现 AI 工具目录' : 'No AI tool folders found',
+    diskHint: zh ? '只删除勾选的安全缓存；会话、项目、设置不会动。' : 'Only checked caches are deleted; chats, projects and settings stay.',
+    over: zh ? '超过' : 'over',
   }
 
   if (!bridge || !token) {
@@ -214,6 +236,34 @@
       .u-span { font-variant-numeric: tabular-nums; color: #8e8e93; min-width: 44px; text-align: right; }
       .usage-meta { margin-top: 7px; padding-top: 7px; border-top: 1px solid rgba(120,120,128,.16);
         font-size: 9.5px; color: #8e8e93; line-height: 1.45; }
+      .update-banner { margin-top: 8px; padding: 7px 9px; border-radius: 9px; display: flex;
+        align-items: center; justify-content: space-between; gap: 8px;
+        background: rgba(77, 107, 254, .12); border: 1px solid rgba(77, 107, 254, .22); }
+      .update-text { font-size: 10.5px; color: #3b55d9; }
+      .update-btn { all: unset; cursor: pointer; font-size: 10.5px; font-weight: 600; color: #fff;
+        background: #4d6bfe; padding: 3px 8px; border-radius: 6px; white-space: nowrap; }
+      .update-btn:disabled { opacity: .6; cursor: default; }
+      .space-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; }
+      .scan-btn, .clean-btn { all: unset; cursor: pointer; font-size: 10.5px; font-weight: 600;
+        color: #3b55d9; background: rgba(77, 107, 254, .12); padding: 4px 9px; border-radius: 7px; }
+      .clean-btn { color: #fff; background: #4d6bfe; }
+      .clean-btn:disabled { opacity: .4; cursor: default; }
+      .space-free { font-size: 10px; color: #8e8e93; font-variant-numeric: tabular-nums; }
+      .disk-list { margin-top: 8px; display: grid; gap: 2px; max-height: 250px; overflow-y: auto; }
+      .disk-row { display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; gap: 7px;
+        align-items: center; padding: 4px 0; border-bottom: 1px solid rgba(120, 120, 128, .08);
+        font-size: 10.5px; }
+      .disk-row:last-child { border-bottom: 0; }
+      .disk-row input { width: 12px; height: 12px; margin: 0; accent-color: #4d6bfe; }
+      .disk-row.readonly { opacity: .72; }
+      .disk-row.readonly .disk-check { visibility: hidden; }
+      .disk-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #3a3a3c; }
+      .disk-sub { display: block; font-size: 9px; color: #8e8e93; overflow: hidden;
+        text-overflow: ellipsis; white-space: nowrap; }
+      .disk-size { font-variant-numeric: tabular-nums; font-weight: 600; color: #1c1c1e; white-space: nowrap; }
+      .disk-tag { font-size: 8.5px; color: #8e8e93; margin-left: 4px; }
+      .disk-tag.over { color: #b25000; }
+      .disk-meta { margin-top: 7px; font-size: 9.5px; color: #8e8e93; line-height: 1.45; }
       [hidden] { display: none !important; }
       @media (prefers-color-scheme: dark) {
         .pill { background: rgba(28,28,30,.84); color: #f2f2f7; border-color: rgba(255,255,255,.16); }
@@ -234,6 +284,12 @@
         .bar { background: rgba(255,255,255,.14); }
         .today-link { border-top-color: rgba(255,255,255,.12); color: #8fa2ff; }
         .u-row { border-bottom-color: rgba(255,255,255,.07); }
+        .update-banner { background: rgba(77,107,254,.18); border-color: rgba(120,150,255,.28); }
+        .update-text { color: #aab8ff; }
+        .disk-name { color: #d1d1d6; }
+        .disk-size { color: #f2f2f7; }
+        .disk-row { border-bottom-color: rgba(255,255,255,.07); }
+        .scan-btn { color: #aab8ff; background: rgba(77,107,254,.22); }
       }
     </style>
     <div class="wrap">
@@ -329,9 +385,14 @@
       </button>
       <div class="panel" role="dialog" aria-label="QuotaPot" data-side="right" data-vertical="up">
         <div class="head"><span class="title">${text.title}</span><button class="refresh" type="button" title="${text.refresh}" aria-label="${text.refresh}">↻</button></div>
+        <div class="update-banner" hidden>
+          <span class="update-text"></span>
+          <button class="update-btn" type="button"></button>
+        </div>
         <div class="tabs" role="tablist">
           <button class="tab active" type="button" role="tab" data-tab="balance" aria-selected="true">${text.balanceTab}</button>
           <button class="tab" type="button" role="tab" data-tab="usage" aria-selected="false">${text.usageTab}</button>
+          <button class="tab" type="button" role="tab" data-tab="space" aria-selected="false">${text.spaceTab}</button>
         </div>
         <div class="view balance-view">
           <div class="total">--</div>
@@ -356,6 +417,17 @@
           <div class="usage-list"></div>
           <div class="usage-meta">${text.loading}</div>
         </div>
+        <div class="view space-view" hidden>
+          <div class="space-actions">
+            <button class="scan-btn" type="button">${text.scan}</button>
+            <span class="space-free"></span>
+          </div>
+          <div class="disk-list"></div>
+          <div class="space-actions">
+            <button class="clean-btn" type="button" disabled>${text.cleanSelected}</button>
+          </div>
+          <div class="disk-meta">${text.diskHint}</div>
+        </div>
       </div>
     </div>
   `
@@ -371,6 +443,15 @@
   const refresh = root.querySelector('.refresh')
   const tabs = [...root.querySelectorAll('.tab')]
   const ranges = [...root.querySelectorAll('.range')]
+  const updateBanner = root.querySelector('.update-banner')
+  const updateText = root.querySelector('.update-text')
+  const updateBtn = root.querySelector('.update-btn')
+  const spaceView = root.querySelector('.space-view')
+  const scanBtn = root.querySelector('.scan-btn')
+  const spaceFree = root.querySelector('.space-free')
+  const diskList = root.querySelector('.disk-list')
+  const cleanBtn = root.querySelector('.clean-btn')
+  const diskMeta = root.querySelector('.disk-meta')
   const balanceView = root.querySelector('.balance-view')
   const usageView = root.querySelector('.usage-view')
   const total = root.querySelector('.total')
@@ -394,7 +475,12 @@
   panel.dataset.side = panelSide
   panel.dataset.vertical = panelVertical
 
-  const state = { open: false, tab: 'balance', days: 1, loading: false, data: null, usage: null, usageLoading: false }
+  const state = {
+    open: false, tab: 'balance', days: 1,
+    loading: false, data: null, usage: null, usageLoading: false,
+    disk: null, diskLoading: false, selected: new Set(), cleanConfirm: false, cleanResult: '',
+    update: null, updatePhase: 'idle', updateError: '',
+  }
 
   const symbolOf = (currency) => ({ CNY: '¥', USD: '$', HKD: 'HK$', EUR: '€', JPY: '¥' }[currency] || `${currency} `)
   const numberFormat = new Intl.NumberFormat(zh ? 'zh-CN' : 'en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -619,12 +705,15 @@
     ranges.forEach(range => range.classList.toggle('active', Number(range.dataset.days) === state.days))
     balanceView.hidden = state.tab !== 'balance'
     usageView.hidden = state.tab !== 'usage'
+    spaceView.hidden = state.tab !== 'space'
     panel.classList.toggle('open', state.open)
     pill.setAttribute('aria-expanded', String(state.open))
-    refresh.classList.toggle('spin', state.loading || state.usageLoading)
+    refresh.classList.toggle('spin', state.loading || state.usageLoading || state.diskLoading)
     renderPill()
+    renderUpdate()
     if (state.tab === 'balance') renderBalance()
-    else renderUsage()
+    else if (state.tab === 'usage') renderUsage()
+    else renderSpace()
     requestAnimationFrame(syncPetAnchor)
   }
 
@@ -666,6 +755,232 @@
     }
     state.usageLoading = false
     render()
+  }
+
+  function formatBytes(bytes) {
+    const number = Number(bytes)
+    if (!Number.isFinite(number) || number < 0) return '—'
+    if (number >= 1073741824) return `${(number / 1073741824).toFixed(2)} GB`
+    if (number >= 1048576) return `${(number / 1048576).toFixed(1)} MB`
+    if (number >= 1024) return `${(number / 1024).toFixed(0)} KB`
+    return `${number} B`
+  }
+
+  function shortPath(path) {
+    return String(path || '')
+      .replace(/^\/Users\/[^/]+/, '~')
+      .replace(/^\/home\/[^/]+/, '~')
+      .replace(/^[A-Za-z]:\\Users\\[^\\]+/, '~')
+  }
+
+  async function checkUpdate(force = false) {
+    try {
+      const response = await fetch(`/quotapot/update-check${force ? '?fresh=1' : ''}`, {
+        cache: 'no-store',
+        headers: { accept: 'application/json', 'x-quotapot-token': token },
+      })
+      if (!response.ok) return
+      const data = await response.json()
+      state.update = data
+      if (!data?.available) { state.updatePhase = 'idle'; state.updateError = '' }
+      renderUpdate()
+    } catch { /* offline: keep the last answer */ }
+  }
+
+  async function runUpdate() {
+    if (!state.update?.available) return
+    if (state.updatePhase === 'idle' || state.updatePhase === 'error') {
+      state.updatePhase = 'confirm'
+      state.updateError = ''
+      renderUpdate()
+      return
+    }
+    if (state.updatePhase !== 'confirm') return
+    state.updatePhase = 'installing'
+    renderUpdate()
+    try {
+      const response = await fetch('/quotapot/update', {
+        method: 'POST',
+        cache: 'no-store',
+        headers: { accept: 'application/json', 'x-quotapot-token': token },
+      })
+      const data = await response.json()
+      if (data?.ok) {
+        state.updatePhase = 'done'
+        state.updateError = ''
+      } else {
+        state.updatePhase = 'error'
+        state.updateError = String(data?.error || 'FAILED')
+      }
+    } catch {
+      state.updatePhase = 'error'
+      state.updateError = 'NETWORK'
+    }
+    renderUpdate()
+  }
+
+  function renderUpdate() {
+    const info = state.update
+    const show = Boolean(info?.available)
+    updateBanner.hidden = !show
+    if (!show) return
+    const version = info.latest ? `v${info.latest}` : ''
+    if (state.updatePhase === 'installing') {
+      updateText.textContent = `${text.updating} ${version}`
+      updateBtn.textContent = text.updating
+      updateBtn.disabled = true
+    } else if (state.updatePhase === 'done') {
+      updateText.textContent = `${version} · ${text.updateDone}`
+      updateBtn.textContent = '✓'
+      updateBtn.disabled = true
+    } else if (state.updatePhase === 'error') {
+      updateText.textContent = `${text.updateFailed}: ${state.updateError || ''}`
+      updateBtn.textContent = text.update
+      updateBtn.disabled = false
+    } else if (state.updatePhase === 'confirm') {
+      updateText.textContent = `${text.updateFound} ${version} · ${text.updateConfirm}?`
+      updateBtn.textContent = text.updateConfirm
+      updateBtn.disabled = false
+    } else {
+      updateText.textContent = `${text.updateFound} ${version}`
+      updateBtn.textContent = text.update
+      updateBtn.disabled = false
+    }
+  }
+
+  async function loadDisk(force = false) {
+    if (state.diskLoading) return
+    state.diskLoading = true
+    renderSpace()
+    try {
+      const response = await fetch(`/quotapot/disk${force ? '?fresh=1' : ''}`, {
+        cache: 'no-store',
+        headers: { accept: 'application/json', 'x-quotapot-token': token },
+      })
+      state.disk = response.status === 401
+        ? { ok: false, error: 'UNAUTHORIZED' }
+        : await response.json()
+    } catch {
+      state.disk = { ok: false, error: 'NETWORK' }
+    }
+    state.diskLoading = false
+    state.selected.clear()
+    state.cleanConfirm = false
+    renderSpace()
+    requestAnimationFrame(syncPetAnchor)
+  }
+
+  function renderSpace() {
+    const disk = state.disk
+    scanBtn.textContent = state.diskLoading ? text.scanning : text.scan
+    scanBtn.disabled = state.diskLoading
+    spaceFree.textContent = disk?.ok && Number.isFinite(disk.free) ? `${text.free} ${formatBytes(disk.free)}` : ''
+    diskList.replaceChildren()
+    cleanBtn.disabled = true
+    cleanBtn.textContent = text.cleanSelected
+    if (!disk) {
+      diskMeta.textContent = text.diskHint
+      return
+    }
+    if (!disk.ok) {
+      diskMeta.textContent = disk.error === 'UNAUTHORIZED' ? text.reload : (state.diskLoading ? text.scanning : text.scanFailed)
+      return
+    }
+    if (state.diskLoading) {
+      diskMeta.textContent = text.scanning
+      return
+    }
+    const thresholdGB = Number(disk.thresholdGB) || 3
+    const threshold = thresholdGB * 1073741824
+    const items = (disk.items || []).filter(item => item.safe || item.size >= threshold)
+    if (items.length === 0) {
+      const empty = document.createElement('div')
+      empty.className = 'disk-meta'
+      empty.textContent = text.noDisk
+      diskList.append(empty)
+    }
+    for (const item of items) {
+      const row = document.createElement('div')
+      row.className = 'disk-row' + (item.safe ? '' : ' readonly')
+      row.title = item.hint ? `${item.label} — ${item.hint}` : item.path
+      const check = document.createElement('span')
+      if (item.safe) {
+        const input = document.createElement('input')
+        input.type = 'checkbox'
+        input.checked = state.selected.has(item.id)
+        input.addEventListener('change', () => {
+          if (input.checked) state.selected.add(item.id)
+          else state.selected.delete(item.id)
+          state.cleanConfirm = false
+          renderSpace()
+        })
+        check.append(input)
+      } else {
+        check.className = 'disk-check'
+        check.textContent = '·'
+      }
+      const nameWrap = document.createElement('div')
+      const name = document.createElement('span')
+      name.className = 'disk-name'
+      name.textContent = item.label
+      const sub = document.createElement('span')
+      sub.className = 'disk-sub'
+      sub.textContent = shortPath(item.path)
+      sub.title = item.path
+      nameWrap.append(name, sub)
+      const sizeWrap = document.createElement('div')
+      const size = document.createElement('span')
+      size.className = 'disk-size'
+      size.textContent = formatBytes(item.size)
+      const tag = document.createElement('span')
+      tag.className = 'disk-tag' + (item.size >= threshold ? ' over' : '')
+      tag.textContent = item.size >= threshold
+        ? `${text.over} ${thresholdGB}GB${item.safe ? '' : ` · ${text.readOnly}`}`
+        : (item.safe ? text.safeTag : text.readOnly)
+      sizeWrap.append(size, tag)
+      row.append(check, nameWrap, sizeWrap)
+      diskList.append(row)
+    }
+    const count = state.selected.size
+    cleanBtn.disabled = count === 0
+    cleanBtn.textContent = state.cleanConfirm
+      ? `${text.confirmClean} (${count})`
+      : `${text.cleanSelected} (${count})`
+    diskMeta.textContent = state.cleanResult || text.diskHint
+  }
+
+  async function cleanSelected() {
+    const ids = [...state.selected]
+    if (ids.length === 0) return
+    if (!state.cleanConfirm) {
+      state.cleanConfirm = true
+      renderSpace()
+      return
+    }
+    state.diskLoading = true
+    state.cleanResult = ''
+    renderSpace()
+    try {
+      const response = await fetch('/quotapot/disk/clean', {
+        method: 'POST',
+        cache: 'no-store',
+        headers: { accept: 'application/json', 'content-type': 'application/json', 'x-quotapot-token': token },
+        body: JSON.stringify({ ids }),
+      })
+      const data = await response.json()
+      if (data?.ok || Number(data?.freed) > 0) {
+        state.cleanResult = `${text.freed} ${formatBytes(data.freed)}`
+      } else {
+        state.cleanResult = `${text.cleanFailed}: ${String(data?.error || '').slice(0, 80)}`
+      }
+    } catch {
+      state.cleanResult = text.cleanFailed
+    }
+    state.diskLoading = false
+    state.selected.clear()
+    state.cleanConfirm = false
+    await loadDisk(true)
+    renderSpace()
   }
 
   let breaching = false
@@ -909,7 +1224,24 @@
   refresh.addEventListener('click', (event) => {
     event.stopPropagation()
     if (state.tab === 'usage') loadUsage(state.days, true)
+    else if (state.tab === 'space') { state.cleanResult = ''; loadDisk(true) }
     else loadBalance(true)
+  })
+
+  updateBtn.addEventListener('click', (event) => {
+    event.stopPropagation()
+    runUpdate()
+  })
+
+  scanBtn.addEventListener('click', (event) => {
+    event.stopPropagation()
+    state.cleanResult = ''
+    loadDisk(true)
+  })
+
+  cleanBtn.addEventListener('click', (event) => {
+    event.stopPropagation()
+    cleanSelected()
   })
 
   tabs.forEach(tab => {
@@ -918,6 +1250,7 @@
       state.tab = tab.dataset.tab
       render()
       if (state.tab === 'usage') loadUsage(state.days, false)
+      else if (state.tab === 'space' && state.disk === null && !state.diskLoading) loadDisk(false)
     })
   })
 
@@ -982,6 +1315,7 @@
   restorePosition()
   render()
   loadBalance(false)
+  checkUpdate()
   pollActivity()
   setInterval(pollActivity, 2_000)
   setInterval(() => {
@@ -989,4 +1323,5 @@
     loadBalance(false)
     if (state.tab === 'usage' && state.open) loadUsage(state.days, false)
   }, refreshSeconds * 1000)
+  setInterval(() => checkUpdate(), 6 * 60 * 60_000)
 })()

@@ -18,8 +18,8 @@
 <script>
   window.__QUOTAPOT__ = {
     token: 'demo',
-    version: '0.2.0',
-    config: { refreshSeconds: 30, lowBalanceThreshold: 5, dailyTokenLimit: 2000000, position: 'bottom-right', locale: 'zh' }
+    version: '0.3.0',
+    config: { refreshSeconds: 30, lowBalanceThreshold: 5, dailyTokenLimit: 2000000, diskThresholdGB: 3, position: 'bottom-right', locale: 'zh' }
   }
   const usageData = {
     ok: true,
@@ -43,8 +43,34 @@
     usage: { todayTokens: 1842300, limit: 2000000, exceeded: false },
     updatedAt: Date.now()
   }
+  const GB = 1073741824
+  const updateData = { current: '0.3.0', latest: '0.3.1', available: true, url: 'https://github.com/Caffrey-Li/dsh-bot-QuotaPot/releases/tag/v0.3.1', notes: 'Faster breach and disk cleanup.', checkedAt: Date.now() }
+  const diskItems = [
+    { id: 'cursor', label: 'Cursor', path: '/Users/demo/Library/Application Support/Cursor', size: Math.round(19.9 * GB), safe: false },
+    { id: 'codex', label: 'Codex data', path: '/Users/demo/.codex', size: Math.round(4.21 * GB), safe: false },
+    { id: 'playwright', label: 'Playwright browsers', path: '/Users/demo/Library/Caches/ms-playwright', size: Math.round(3.06 * GB), safe: true },
+    { id: 'pnpm', label: 'pnpm store', path: '/Users/demo/Library/pnpm/store', size: Math.round(1.54 * GB), safe: true },
+    { id: 'cursor-cacheddata', label: 'Cursor CachedData', path: '/Users/demo/Library/Application Support/Cursor/CachedData', size: Math.round(1.24 * GB), safe: true },
+    { id: 'dsh', label: 'DSH / DS Bot data', path: '/Users/demo/.dsh', size: Math.round(0.71 * GB), safe: false },
+    { id: 'npm', label: 'npm cache', path: '/Users/demo/.npm/_cacache', size: Math.round(0.26 * GB), safe: true },
+  ]
+  const diskData = { ok: true, items: diskItems, free: Math.round(26.2 * GB), thresholdGB: 3, scannedAt: Date.now() }
   const realFetch = window.fetch.bind(window)
   window.fetch = (url, options) => {
+    if (String(url).startsWith('/quotapot/update-check')) {
+      return Promise.resolve(new Response(JSON.stringify(updateData), { status: 200, headers: { 'content-type': 'application/json' } }))
+    }
+    if (String(url).startsWith('/quotapot/update')) {
+      return Promise.resolve(new Response(JSON.stringify({ ok: true, version: '0.3.1', restartRequired: true }), { status: 200, headers: { 'content-type': 'application/json' } }))
+    }
+    if (String(url).startsWith('/quotapot/disk/clean')) {
+      const body = JSON.parse(options?.body || '{}')
+      const freed = diskItems.filter(item => (body.ids || []).includes(item.id)).reduce((sum, item) => sum + item.size, 0)
+      return Promise.resolve(new Response(JSON.stringify({ ok: true, freed, cleaned: body.ids, errors: [] }), { status: 200, headers: { 'content-type': 'application/json' } }))
+    }
+    if (String(url).startsWith('/quotapot/disk')) {
+      return Promise.resolve(new Response(JSON.stringify(diskData), { status: 200, headers: { 'content-type': 'application/json' } }))
+    }
     if (String(url).startsWith('/quotapot/balance')) {
       return Promise.resolve(new Response(JSON.stringify(balanceData), { status: 200, headers: { 'content-type': 'application/json' } }))
     }
@@ -66,6 +92,11 @@
     setTimeout(() => {
       document.getElementById('quotapot-host')?.shadowRoot?.querySelectorAll('.tab')[1]?.click()
     }, 1300)
+  }
+  if (new URLSearchParams(location.search).get('tab') === 'space') {
+    setTimeout(() => {
+      document.getElementById('quotapot-host')?.shadowRoot?.querySelectorAll('.tab')[2]?.click()
+    }, 1500)
   }
 
 

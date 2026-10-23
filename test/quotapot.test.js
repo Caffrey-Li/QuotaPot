@@ -2,6 +2,8 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
   aggregateUsage,
+  diskTargets,
+  newerVersion,
   normalizeBalance,
   normalizeConfig,
   parseCredentialRefs,
@@ -18,6 +20,7 @@ test('normalizeConfig fills safe defaults', () => {
   assert.equal(config.refreshSeconds, 30)
   assert.equal(config.lowBalanceThreshold, 5)
   assert.equal(config.dailyTokenLimit, 0)
+  assert.equal(config.diskThresholdGB, 3)
   assert.equal(config.position, 'bottom-right')
   assert.equal(config.locale, 'auto')
 })
@@ -165,4 +168,25 @@ test('withDailyLimit marks the configured threshold', () => {
   assert.equal(withDailyLimit(usage, 200).daily.exceeded, false)
   assert.equal(withDailyLimit(usage, 0).daily.exceeded, false)
   assert.equal(withDailyLimit({ ok: false }, 100).ok, false)
+})
+
+
+test('newerVersion compares semver cores', () => {
+  assert.equal(newerVersion('0.3.0', '0.2.0'), true)
+  assert.equal(newerVersion('v0.2.1', '0.2.0'), true)
+  assert.equal(newerVersion('0.2.0', '0.2.0'), false)
+  assert.equal(newerVersion('0.1.9', '0.2.0'), false)
+  assert.equal(newerVersion('1.0.0', '0.9.9'), true)
+})
+
+test('disk targets keep user data out of the safe list', () => {
+  const targets = diskTargets()
+  const byId = new Map(targets.map(target => [target.id, target]))
+  assert.equal(byId.get('dsh').safe, false)
+  assert.equal(byId.get('cursor').safe, false)
+  assert.equal(byId.get('ollama').safe, false)
+  assert.equal(byId.get('playwright').safe, true)
+  const safePaths = targets.filter(target => target.safe).map(target => target.path)
+  assert.equal(safePaths.includes(byId.get('dsh').path), false)
+  assert.equal(safePaths.includes(byId.get('cursor').path), false)
 })

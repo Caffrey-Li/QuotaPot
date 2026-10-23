@@ -17,6 +17,8 @@ QuotaPot 是一个 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-ha
 - **用量标签**：今日 / 7 天 / 30 天，全部 Bot 与每个 Bot 的 token、会话跨度
 - **每日 token 上限**：超过 `dailyTokenLimit` 时胶囊变红并显示 `超`
 - **低余额提醒**：低于阈值时胶囊变红并显示 `低`，面板给出提示
+- **更新提示**：读取 GitHub 最新 Release，发现新版本时在面板顶部提示；点击两次即可安装，重启 DSH 生效
+- **空间监控**：扫描本机 AI 工具目录，列出超过 3GB 的数据和可清理缓存；只允许删除白名单缓存，勾选并二次确认
 - **多币种**：官方返回多个币种时全部列出，胶囊优先显示 CNY
 - **中英自动切换**：按系统语言和时区自动选中文/英文，也可强制 `zh` / `en`
 - **零依赖、无构建**：没有 React、没有打包步骤，`index.js` + `widget.js` 两个文件
@@ -37,7 +39,7 @@ QuotaPot 是一个 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-ha
 打开 **设置 → 插件 → 添加插件**，在“包名或地址”里填：
 
 ```text
-github:Caffrey-Li/dsh-bot-QuotaPot#v0.2.0
+github:Caffrey-Li/dsh-bot-QuotaPot#v0.3.0
 ```
 
 或者，等 npm 发布后直接填包名：
@@ -51,7 +53,7 @@ dsh-bot-quotapot
 ### 方式二：命令行（DSH Web profile）
 
 ```sh
-npx @deepseek-ai/dsh@0.2.0-rc.2 plugin --profile web add github:Caffrey-Li/dsh-bot-QuotaPot#v0.2.0
+npx @deepseek-ai/dsh@0.2.0-rc.2 plugin --profile web add github:Caffrey-Li/dsh-bot-QuotaPot#v0.3.0
 npx @deepseek-ai/dsh@0.2.0-rc.2 web
 ```
 
@@ -59,7 +61,7 @@ npx @deepseek-ai/dsh@0.2.0-rc.2 web
 
 ### 方式三：离线 `.tgz`
 
-从 [Releases](https://github.com/Caffrey-Li/dsh-bot-QuotaPot/releases) 下载 `dsh-bot-quotapot-0.2.0.tgz`，在插件页面选择本地文件安装。
+从 [Releases](https://github.com/Caffrey-Li/dsh-bot-QuotaPot/releases) 下载 `dsh-bot-quotapot-0.3.0.tgz`，在插件页面选择本地文件安装。
 
 ## 配置
 
@@ -73,6 +75,7 @@ npx @deepseek-ai/dsh@0.2.0-rc.2 web
     refreshSeconds: 30
     lowBalanceThreshold: 5
     dailyTokenLimit: 2000000
+    diskThresholdGB: 3
     position: bottom-right
     locale: auto
 ```
@@ -84,6 +87,7 @@ npx @deepseek-ai/dsh@0.2.0-rc.2 web
 | `refreshSeconds` | `30` | 轮询间隔，限制在 10–600 秒 |
 | `lowBalanceThreshold` | `5` | 低于该金额时提醒；`0` 关闭 |
 | `dailyTokenLimit` | `0` | 每天 token 上限（含缓存），`0` 关闭；达到后胶囊变红 |
+| `diskThresholdGB` | `3` | 空间标签页中标记“超过”的阈值（GB） |
 | `position` | `bottom-right` | `bottom-right` / `bottom-left` / `top-right` / `top-left` |
 | `locale` | `auto` | `auto` 按系统语言/时区自动选（中国时区或中文系统 → 中文，否则英文）；或强制 `zh` / `en` |
 

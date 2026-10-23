@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.0 — 2026-10-23
+
+- Version check against GitHub Releases, an update banner, and one-click install
+  through DSH's plugin manager. The new version loads after a DSH restart.
+- New Space tab: scans known AI tool folders, shows AI data over 3GB and safe
+  cache folders, and lets you select caches to delete.
+- Cleanup is restricted to a server-side whitelist. Sessions, projects, settings,
+  Cursor snapshots/globalStorage and `~/.dsh` data are shown read-only and are
+  never deleted.
+- New `diskThresholdGB` option (default 3).
+
 ## 0.2.0 — 2026-10-23
 
 - Usage tab in the panel: today / 7 days / 30 days.

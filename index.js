@@ -4,11 +4,13 @@
 // local credential file are fallbacks), caches the balance briefly, and serves
 // it to the page over a token-protected same-origin route. The key never leaves
 // this process.
+import { execFile } from 'node:child_process'
 import { createHash, randomUUID, timingSafeEqual } from 'node:crypto'
 import { readFileSync } from 'node:fs'
-import { readFile } from 'node:fs/promises'
+import { readFile, rm, stat, statfs } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
+import { promisify } from 'node:util'
 
 export const name = 'dsh-bot-quotapot'
 export const inject = ['webServer']
@@ -21,6 +23,12 @@ const ERROR_CACHE_MS = 5_000
 const USAGE_CACHE_MS = 20_000
 const USAGE_DAYS = [1, 7, 30]
 const POSITIONS = ['bottom-right', 'bottom-left', 'top-right', 'top-left']
+const REPO = 'Caffrey-Li/dsh-bot-QuotaPot'
+const UPDATE_TTL_MS = 6 * 60 * 60_000
+const UPDATE_TIMEOUT_MS = 15_000
+const DISK_CACHE_MS = 60_000
+const DEFAULT_DISK_GB = 3
+const execFileAsync = promisify(execFile)
 
 let credentialRefFn
 let pending = null
@@ -43,12 +51,14 @@ export function normalizeConfig(raw = {}) {
     : 'DEEPSEEK_API_KEY'
   const threshold = Number(raw.lowBalanceThreshold)
   const daily = Number(raw.dailyTokenLimit)
+  const disk = Number(raw.diskThresholdGB)
   return {
     apiKeyEnv,
     baseUrl,
     refreshSeconds: clampInt(raw.refreshSeconds, 10, 600, 30),
     lowBalanceThreshold: Number.isFinite(threshold) ? Math.max(0, threshold) : 5,
     dailyTokenLimit: Number.isFinite(daily) ? Math.max(0, Math.round(daily)) : 0,
+    diskThresholdGB: Number.isFinite(disk) && disk > 0 ? disk : DEFAULT_DISK_GB,
     position: POSITIONS.includes(raw.position) ? raw.position : 'bottom-right',
     locale: ['auto', 'zh', 'en'].includes(raw.locale) ? raw.locale : 'auto',
   }
@@ -234,6 +244,202 @@ export function withDailyLimit(usage, limit) {
   }
 }
 
+
+/** Semver comparison for the release tag; prereleases compare by their numeric core. */
+export function newerVersion(a, b) {
+  const parse = value => String(value ?? '').trim().replace(/^v/i, '').split('-')[0]
+    .split('.').map(part => Number.parseInt(part, 10) || 0)
+  const x = parse(a)
+  const y = parse(b)
+  for (let index = 0; index < 3; index++) {
+    if (x[index] !== y[index]) return x[index] > y[index]
+  }
+  return false
+}
+
+let updateCache = { at: 0, data: null }
+let installingUpdate = null
+
+async function fetchLatestRelease() {
+  const response = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, {
+    headers: { accept: 'application/vnd.github+json', 'user-agent': `dsh-bot-quotapot/${VERSION}` },
+    signal: AbortSignal.timeout(UPDATE_TIMEOUT_MS),
+  })
+  if (!response.ok) throw new Error(`GitHub answered ${response.status}`)
+  return response.json()
+}
+
+/** Latest GitHub release compared with this build. Cached for six hours. */
+export async function checkUpdate({ fresh = false } = {}) {
+  if (!fresh && updateCache.data !== null && Date.now() - updateCache.at < UPDATE_TTL_MS) return updateCache.data
+  try {
+    const release = await fetchLatestRelease()
+    const latest = String(release?.tag_name ?? '').replace(/^v/i, '')
+    const data = {
+      current: VERSION,
+      latest: latest || null,
+      available: latest !== '' && newerVersion(latest, VERSION),
+      url: release?.html_url ?? null,
+      notes: String(release?.body ?? '').slice(0, 700),
+      publishedAt: release?.published_at ?? null,
+      checkedAt: Date.now(),
+    }
+    updateCache = { at: Date.now(), data }
+    return data
+  } catch (error) {
+    return {
+      current: VERSION,
+      latest: null,
+      available: false,
+      error: String(error?.message ?? error).slice(0, 180),
+      checkedAt: Date.now(),
+    }
+  }
+}
+
+/** Install the latest release through DSH's plugin manager; it runs after a restart. */
+export async function installUpdate(ctx) {
+  if (installingUpdate !== null) return installingUpdate
+  installingUpdate = (async () => {
+    const info = await checkUpdate({ fresh: true })
+    if (!info.latest) return { ok: false, error: info.error ?? 'NO_RELEASE' }
+    if (!info.available) return { ok: false, error: 'NO_UPDATE', latest: info.latest }
+    const manager = ctx.get?.('pluginManager')
+    if (typeof manager?.installBundle !== 'function') return { ok: false, error: 'NO_PLUGIN_MANAGER' }
+    try {
+      const result = await manager.installBundle(`github:${REPO}#v${info.latest}`, {})
+      if (result?.error || !['applied', 'restart-required'].includes(result?.application)) {
+        return { ok: false, error: String(result?.error?.diagnostic ?? result?.error?.code ?? `install ${result?.application ?? 'failed'}`).slice(0, 300) }
+      }
+      updateCache = { at: 0, data: null }
+      return { ok: true, version: info.latest, restartRequired: true }
+    } catch (error) {
+      return { ok: false, error: String(error?.message ?? error).slice(0, 300) }
+    }
+  })().finally(() => { installingUpdate = null })
+  return installingUpdate
+}
+
+const PLATFORM = process.platform
+const APP_SUPPORT = PLATFORM === 'darwin'
+  ? join(homedir(), 'Library', 'Application Support')
+  : PLATFORM === 'win32'
+    ? (process.env.APPDATA || join(homedir(), 'AppData', 'Roaming'))
+    : join(homedir(), '.config')
+const CACHE_DIR = PLATFORM === 'darwin'
+  ? join(homedir(), 'Library', 'Caches')
+  : PLATFORM === 'win32'
+    ? (process.env.LOCALAPPDATA || join(homedir(), 'AppData', 'Local'))
+    : join(homedir(), '.cache')
+
+/** Known AI tool directories. Only entries marked safe may ever be deleted. */
+export function diskTargets() {
+  const pnpmStore = PLATFORM === 'darwin'
+    ? join(homedir(), 'Library', 'pnpm', 'store')
+    : PLATFORM === 'win32'
+      ? join(process.env.LOCALAPPDATA || join(homedir(), 'AppData', 'Local'), 'pnpm', 'store')
+      : join(homedir(), '.local', 'share', 'pnpm', 'store')
+  return [
+    { id: 'dsh', label: 'DSH / DS Bot data', path: DSH_HOME, safe: false, hint: 'sessions, bot data, workspace' },
+    { id: 'playwright', label: 'Playwright browsers', path: join(CACHE_DIR, 'ms-playwright'), safe: true, hint: 're-downloaded when needed' },
+    { id: 'cursor', label: 'Cursor', path: join(APP_SUPPORT, 'Cursor'), safe: false, hint: 'chats, settings, snapshots' },
+    { id: 'cursor-cacheddata', label: 'Cursor CachedData', path: join(APP_SUPPORT, 'Cursor', 'CachedData'), safe: true },
+    { id: 'cursor-cache', label: 'Cursor Cache', path: join(APP_SUPPORT, 'Cursor', 'Cache'), safe: true },
+    { id: 'cursor-codecache', label: 'Cursor Code Cache', path: join(APP_SUPPORT, 'Cursor', 'Code Cache'), safe: true },
+    { id: 'cursor-gpucache', label: 'Cursor GPUCache', path: join(APP_SUPPORT, 'Cursor', 'GPUCache'), safe: true },
+    { id: 'cursor-logs', label: 'Cursor logs', path: join(APP_SUPPORT, 'Cursor', 'logs'), safe: true },
+    { id: 'npm', label: 'npm cache', path: join(homedir(), '.npm', '_cacache'), safe: true },
+    { id: 'pnpm', label: 'pnpm store', path: pnpmStore, safe: true, hint: 'rebuilt on demand' },
+    { id: 'hf', label: 'HuggingFace cache', path: join(homedir(), '.cache', 'huggingface'), safe: true, hint: 'models re-download' },
+    { id: 'ollama', label: 'Ollama models', path: join(homedir(), '.ollama'), safe: false, hint: 'models must be pulled again' },
+    { id: 'claude', label: 'Claude data', path: join(APP_SUPPORT, 'Claude'), safe: false },
+    { id: 'chatgpt', label: 'ChatGPT data', path: join(APP_SUPPORT, 'ChatGPT'), safe: false },
+    { id: 'codex', label: 'Codex data', path: join(homedir(), '.codex'), safe: false },
+  ]
+}
+
+async function directorySize(path) {
+  try {
+    if (PLATFORM === 'win32') {
+      const escaped = path.replace(/'/g, "''")
+      const { stdout } = await execFileAsync('powershell.exe', [
+        '-NoProfile', '-Command',
+        `(Get-ChildItem -LiteralPath '${escaped}' -Recurse -Force -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum`,
+      ], { timeout: 30_000, maxBuffer: 1024 * 1024 })
+      const bytes = Number(String(stdout).trim())
+      return Number.isFinite(bytes) ? bytes : null
+    }
+    const { stdout } = await execFileAsync('du', ['-sk', path], { timeout: 30_000, maxBuffer: 1024 * 1024 })
+    const kb = Number.parseInt(String(stdout).split(/\s+/)[0], 10)
+    return Number.isFinite(kb) ? kb * 1024 : null
+  } catch {
+    return null
+  }
+}
+
+let diskCache = { at: 0, data: null }
+
+/** Scan known AI directories; read-only, cached for a minute. */
+export async function scanDisk(config, { fresh = false } = {}) {
+  if (!fresh && diskCache.data !== null && Date.now() - diskCache.at < DISK_CACHE_MS) return diskCache.data
+  const items = []
+  for (const target of diskTargets()) {
+    try {
+      if (!(await stat(target.path)).isDirectory()) continue
+    } catch {
+      continue
+    }
+    const size = await directorySize(target.path)
+    if (size === null) continue
+    items.push({ ...target, size })
+  }
+  let free = null
+  try {
+    const info = await statfs(DSH_HOME)
+    free = info.bavail * info.bsize
+  } catch { /* free space is optional */ }
+  const data = {
+    ok: true,
+    items: items.sort((a, b) => b.size - a.size),
+    free,
+    thresholdGB: config.diskThresholdGB,
+    scannedAt: Date.now(),
+  }
+  diskCache = { at: Date.now(), data }
+  return data
+}
+
+/** Delete only whitelisted cache targets; the id map is the security boundary. */
+export async function cleanDisk(ids) {
+  const safe = new Map(diskTargets().filter(target => target.safe).map(target => [target.id, target]))
+  const cleaned = []
+  const errors = []
+  let freed = 0
+  for (const id of Array.isArray(ids) ? ids : []) {
+    const target = safe.get(String(id))
+    if (!target) { errors.push({ id: String(id), error: 'NOT_SAFE' }); continue }
+    const size = await directorySize(target.path) ?? 0
+    try {
+      await rm(target.path, { recursive: true, force: true })
+      freed += size
+      cleaned.push(target.id)
+    } catch (error) {
+      errors.push({ id: target.id, error: String(error?.message ?? error).slice(0, 160) })
+    }
+  }
+  diskCache = { at: 0, data: null }
+  return { ok: errors.length === 0, freed, cleaned, errors }
+}
+
+async function readJsonBody(req) {
+  let text = ''
+  for await (const chunk of req) {
+    text += chunk
+    if (text.length > 1_000_000) throw new Error('BODY_TOO_LARGE')
+  }
+  return text === '' ? {} : JSON.parse(text)
+}
+
 /** Constant-time check for the per-process page token. */
 export function tokenMatches(expected, received) {
   const a = Buffer.from(String(expected ?? ''))
@@ -335,6 +541,7 @@ export function apply(ctx, rawConfig = {}) {
     refreshSeconds: config.refreshSeconds,
     lowBalanceThreshold: config.lowBalanceThreshold,
     dailyTokenLimit: config.dailyTokenLimit,
+    diskThresholdGB: config.diskThresholdGB,
     position: config.position,
     locale: config.locale,
   }
@@ -374,6 +581,82 @@ export function apply(ctx, rawConfig = {}) {
       })
     },
   }), 'quotapot: balance route')
+
+  ctx.effect(() => ctx.webServer.register({
+    kind: 'exact',
+    path: '/quotapot/update-check',
+    handler: async (req, res) => {
+      if (req.method !== 'GET') {
+        sendJson(res, 405, { ok: false, error: 'METHOD_NOT_ALLOWED' }, { allow: 'GET' })
+        return
+      }
+      if (!tokenMatches(token, req.headers['x-quotapot-token'])) {
+        sendJson(res, 401, { ok: false, error: 'UNAUTHORIZED' })
+        return
+      }
+      const url = new URL(req.url ?? '/', 'http://127.0.0.1')
+      sendJson(res, 200, await checkUpdate({ fresh: url.searchParams.has('fresh') }))
+    },
+  }), 'quotapot: update check')
+
+  ctx.effect(() => ctx.webServer.register({
+    kind: 'exact',
+    path: '/quotapot/update',
+    handler: async (req, res) => {
+      if (req.method !== 'POST') {
+        sendJson(res, 405, { ok: false, error: 'METHOD_NOT_ALLOWED' }, { allow: 'POST' })
+        return
+      }
+      if (!tokenMatches(token, req.headers['x-quotapot-token'])) {
+        sendJson(res, 401, { ok: false, error: 'UNAUTHORIZED' })
+        return
+      }
+      sendJson(res, 200, await installUpdate(ctx))
+    },
+  }), 'quotapot: update install')
+
+  ctx.effect(() => ctx.webServer.register({
+    kind: 'exact',
+    path: '/quotapot/disk',
+    handler: async (req, res) => {
+      if (req.method !== 'GET') {
+        sendJson(res, 405, { ok: false, error: 'METHOD_NOT_ALLOWED' }, { allow: 'GET' })
+        return
+      }
+      if (!tokenMatches(token, req.headers['x-quotapot-token'])) {
+        sendJson(res, 401, { ok: false, error: 'UNAUTHORIZED' })
+        return
+      }
+      const url = new URL(req.url ?? '/', 'http://127.0.0.1')
+      sendJson(res, 200, await scanDisk(config, { fresh: url.searchParams.has('fresh') }))
+    },
+  }), 'quotapot: disk scan')
+
+  ctx.effect(() => ctx.webServer.register({
+    kind: 'exact',
+    path: '/quotapot/disk/clean',
+    handler: async (req, res) => {
+      if (req.method !== 'POST') {
+        sendJson(res, 405, { ok: false, error: 'METHOD_NOT_ALLOWED' }, { allow: 'POST' })
+        return
+      }
+      if (!tokenMatches(token, req.headers['x-quotapot-token'])) {
+        sendJson(res, 401, { ok: false, error: 'UNAUTHORIZED' })
+        return
+      }
+      try {
+        const body = await readJsonBody(req)
+        const ids = Array.isArray(body?.ids) ? body.ids : []
+        if (ids.length === 0) {
+          sendJson(res, 400, { ok: false, error: 'NO_TARGETS' })
+          return
+        }
+        sendJson(res, 200, await cleanDisk(ids))
+      } catch (error) {
+        sendJson(res, 400, { ok: false, error: String(error?.message ?? error).slice(0, 160) })
+      }
+    },
+  }), 'quotapot: disk clean')
 
   ctx.effect(() => ctx.webServer.register({
     kind: 'exact',

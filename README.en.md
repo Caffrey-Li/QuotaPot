@@ -37,7 +37,7 @@ The whale is pure SVG: a radial gradient, specular highlight, ambient shadow, ri
 Open **Settings → Plugins → Add plugin**, then enter:
 
 ```text
-github:Caffrey-Li/dsh-bot-QuotaPot#v0.2.0
+github:Caffrey-Li/dsh-bot-QuotaPot#v0.3.0
 ```
 
 After the npm release is published, you can use the package name instead:
@@ -51,7 +51,7 @@ Restart DSH completely if it says the change takes effect at the next start.
 ### 2. CLI (DSH Web profile)
 
 ```sh
-npx @deepseek-ai/dsh@0.2.0-rc.2 plugin --profile web add github:Caffrey-Li/dsh-bot-QuotaPot#v0.2.0
+npx @deepseek-ai/dsh@0.2.0-rc.2 plugin --profile web add github:Caffrey-Li/dsh-bot-QuotaPot#v0.3.0
 npx @deepseek-ai/dsh@0.2.0-rc.2 web
 ```
 
@@ -59,7 +59,7 @@ npx @deepseek-ai/dsh@0.2.0-rc.2 web
 
 ### 3. Offline `.tgz`
 
-Download `dsh-bot-quotapot-0.2.0.tgz` from [Releases](https://github.com/Caffrey-Li/dsh-bot-QuotaPot/releases) and install it from the Plugins page.
+Download `dsh-bot-quotapot-0.3.0.tgz` from [Releases](https://github.com/Caffrey-Li/dsh-bot-QuotaPot/releases) and install it from the Plugins page.
 
 ## Configuration
 
@@ -73,6 +73,7 @@ Everything is optional. Add this to the profile's `cordis.patch.yml`:
     refreshSeconds: 30
     lowBalanceThreshold: 5
     dailyTokenLimit: 2000000
+    diskThresholdGB: 3
     position: bottom-right
     locale: auto
 ```
@@ -84,6 +85,7 @@ Everything is optional. Add this to the profile's `cordis.patch.yml`:
 | `refreshSeconds` | `30` | Poll interval, clamped to 10–600 seconds |
 | `lowBalanceThreshold` | `5` | Warn below this amount; `0` disables it |
 | `dailyTokenLimit` | `0` | Daily token cap (cache included); `0` disables it |
+| `diskThresholdGB` | `3` | Threshold (GB) used for the "over" tag in the Space tab |
 | `position` | `bottom-right` | `bottom-right` / `bottom-left` / `top-right` / `top-left` |
 | `locale` | `auto` | `auto` uses the system language/time zone (Chinese zone or Chinese system → Chinese, else English); or force `zh` / `en` |
 
