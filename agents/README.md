@@ -17,9 +17,12 @@ npx --yes @vscode/vsce package --no-dependencies --allow-missing-repository
 
 Reload Cursor (**Developer: Reload Window**), then:
 
+- A compact **QuotaPot side bar view** in the activity bar. Drag its icon to the secondary side bar or panel, resize it, or collapse it. The status bar click focuses the view instead of opening an editor tab.
 - Status bar: `QuotaPot ¥34.21 · C 78% · X 60%`
-- Click it to open the panel with DeepSeek balance, Cursor plan/usage and Codex tokens/rate limits.
-- The panel has the QuotaPot whale: it floats on the wave, breaches periodically, splashes on exit/entry, spouts, and breaches once when clicked.
+- The side bar has the QuotaPot whale (floats, breaches, splashes, spouts, click to breach) and vertical cards for DeepSeek balance, Cursor usage and Codex usage.
+- **QuotaPot: Open in Editor** opens the wide three-column view if you want it; the default is the side bar.
+- Thresholds: click the gear in the side bar header, or run **QuotaPot: Open Settings**. Settings include `deepseekLowBalance`, `cursorWarningPercent`, `codexWarningPercent` and `dailyTokenLimit`. Reaching one turns the status bar/card warning color.
+- The disk threshold is in DSH QuotaPot's **Space** tab (inline GB field, default 3); the Cursor side bar deliberately does not include a disk scanner.
 - Run **QuotaPot: Set DeepSeek API Key** to store the key in Cursor SecretStorage.
 - `QuotaPot: Open Cursor Usage Dashboard` opens the official page.
 

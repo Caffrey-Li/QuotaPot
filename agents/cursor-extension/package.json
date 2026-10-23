@@ -5,16 +5,43 @@
   "version": "0.1.0",
   "publisher": "caffrey-li",
   "license": "MIT",
-  "engines": { "vscode": "^1.85.0" },
-  "categories": ["Other"],
-  "activationEvents": ["onStartupFinished"],
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished",
+    "onView:quotapot.view"
+  ],
   "main": "./extension.js",
   "contributes": {
     "commands": [
-      { "command": "quotapot.open", "title": "QuotaPot: Open Panel" },
-      { "command": "quotapot.refresh", "title": "QuotaPot: Refresh" },
-      { "command": "quotapot.setApiKey", "title": "QuotaPot: Set DeepSeek API Key" },
-      { "command": "quotapot.openCursorDashboard", "title": "QuotaPot: Open Cursor Usage Dashboard" }
+      {
+        "command": "quotapot.open",
+        "title": "QuotaPot: Focus Side Bar"
+      },
+      {
+        "command": "quotapot.openEditor",
+        "title": "QuotaPot: Open in Editor"
+      },
+      {
+        "command": "quotapot.openSettings",
+        "title": "QuotaPot: Open Settings"
+      },
+      {
+        "command": "quotapot.refresh",
+        "title": "QuotaPot: Refresh"
+      },
+      {
+        "command": "quotapot.setApiKey",
+        "title": "QuotaPot: Set DeepSeek API Key"
+      },
+      {
+        "command": "quotapot.openCursorDashboard",
+        "title": "QuotaPot: Open Cursor Usage Dashboard"
+      }
     ],
     "configuration": {
       "title": "QuotaPot",
@@ -37,11 +64,61 @@
         },
         "quotapot.statusBar": {
           "type": "string",
-          "enum": ["all", "balance", "cursor", "codex"],
+          "enum": [
+            "all",
+            "balance",
+            "cursor",
+            "codex"
+          ],
           "default": "all",
           "description": "What to show in the status bar."
+        },
+        "quotapot.deepseekLowBalance": {
+          "type": "number",
+          "default": 5,
+          "minimum": 0,
+          "description": "Warn when a DeepSeek balance is below this amount (0 disables)."
+        },
+        "quotapot.cursorWarningPercent": {
+          "type": "number",
+          "default": 80,
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Warn when Cursor included usage reaches this percent."
+        },
+        "quotapot.codexWarningPercent": {
+          "type": "number",
+          "default": 80,
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Warn when the Codex 5h or 7d window reaches this percent."
+        },
+        "quotapot.dailyTokenLimit": {
+          "type": "number",
+          "default": 0,
+          "minimum": 0,
+          "description": "Warn when local Codex tokens today exceed this number (0 disables)."
         }
       }
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "quotapot",
+          "title": "QuotaPot",
+          "icon": "media/quotapot.svg"
+        }
+      ]
+    },
+    "views": {
+      "quotapot": [
+        {
+          "type": "webview",
+          "id": "quotapot.view",
+          "name": "QuotaPot",
+          "contextualTitle": "QuotaPot"
+        }
+      ]
     }
   }
 }

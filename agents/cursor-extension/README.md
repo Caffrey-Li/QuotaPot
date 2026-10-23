@@ -2,9 +2,10 @@
 
 Cursor / VS Code extension half of QuotaPot.
 
-- Status bar: DeepSeek balance, Cursor remaining quota, Codex 5h usage.
-- Panel: animated QuotaPot whale above the cards; per-currency DeepSeek balance, Cursor plan/remaining/cycle, local Codex tokens and rate limits.
+- Compact side bar view (activity bar) with vertical cards; drag/resize/collapse it. Status bar click focuses it.
+- Editor view is available with **QuotaPot: Open in Editor** for a wide layout.
 - The whale floats, breaches periodically, splashes, spouts, and breaches once when clicked.
+- Thresholds: gear button / **QuotaPot: Open Settings**: DeepSeek low balance, Cursor warning %, Codex warning %, daily Codex token limit. Warnings turn the status bar and cards red.
 - DeepSeek key is stored with `context.secrets`; set it from **QuotaPot: Set DeepSeek API Key**.
 - Cursor usage uses the same undocumented dashboard API as the existing Cursor Usage extension. It reads `cursorAuth/accessToken` from `state.vscdb` with `sqlite3`; it may break when Cursor changes the API.
 - Codex usage comes from local `~/.codex/sessions/**/*.jsonl`; sessions that do not record `token_count` events are ignored.

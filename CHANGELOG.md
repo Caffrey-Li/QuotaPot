@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.1 — 2026-10-23
+
+- The Space tab now has an inline threshold field; it filters the list and the
+  "over" tag without changing the server-side scan. The value is persisted in
+  the browser.
+- The `diskThresholdGB` config remains the default.
+- Cursor extension: compact side-bar view with the animated whale, plus
+  configurable DeepSeek / Cursor / Codex warning thresholds.
+
 ## 0.3.0 — 2026-10-23
 
 - Version check against GitHub Releases, an update banner, and one-click install

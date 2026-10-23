@@ -1,6 +1,6 @@
 {
   "name": "dsh-bot-quotapot",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "QuotaPot: a floating DeepSeek balance and token-usage pill for DeepSeek Harness (DSH) and DS Bot, with daily token limits, session spans and multi-currency support.",
   "type": "module",
   "main": "index.js",

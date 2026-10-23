@@ -84,7 +84,8 @@
     cleanFailed: zh ? '清理失败' : 'Cleanup failed',
     scanFailed: zh ? '扫描失败' : 'Scan failed',
     noDisk: zh ? '未发现 AI 工具目录' : 'No AI tool folders found',
-    diskHint: zh ? '只删除勾选的安全缓存；会话、项目、设置不会动。' : 'Only checked caches are deleted; chats, projects and settings stay.',
+    diskHint: zh ? '阈值只用于高亮，不限制清理；有勾选框的是安全缓存，没有勾选框的是用户数据，删除会丢会话/设置/快照。' : 'The threshold only highlights; it never gates cleanup. Checkboxes are safe caches; uncheckable rows are user data (chats, settings, snapshots).',
+    diskThreshold: zh ? '阈值' : 'Threshold',
     over: zh ? '超过' : 'over',
   }
 
@@ -264,6 +265,11 @@
       .disk-tag { font-size: 8.5px; color: #8e8e93; margin-left: 4px; }
       .disk-tag.over { color: #b25000; }
       .disk-meta { margin-top: 7px; font-size: 9.5px; color: #8e8e93; line-height: 1.45; }
+      .disk-threshold { display: flex; align-items: center; gap: 4px; font-size: 9.5px; color: #8e8e93; }
+      .disk-threshold input { width: 44px; box-sizing: border-box; border: 1px solid rgba(120, 120, 128, .22);
+        background: transparent; color: inherit; border-radius: 5px; padding: 2px 4px; font: inherit;
+        font-variant-numeric: tabular-nums; }
+      .disk-threshold input:focus { outline: 1px solid #4d6bfe; outline-offset: 1px; }
       [hidden] { display: none !important; }
       @media (prefers-color-scheme: dark) {
         .pill { background: rgba(28,28,30,.84); color: #f2f2f7; border-color: rgba(255,255,255,.16); }
@@ -290,6 +296,7 @@
         .disk-size { color: #f2f2f7; }
         .disk-row { border-bottom-color: rgba(255,255,255,.07); }
         .scan-btn { color: #aab8ff; background: rgba(77,107,254,.22); }
+        .disk-threshold input { border-color: rgba(255,255,255,.18); }
       }
     </style>
     <div class="wrap">
@@ -424,6 +431,10 @@
           </div>
           <div class="disk-list"></div>
           <div class="space-actions">
+            <label class="disk-threshold">${text.diskThreshold}
+              <input class="disk-threshold-input" type="number" min="1" step="1" inputmode="numeric" aria-label="${text.diskThreshold}">
+              GB
+            </label>
             <button class="clean-btn" type="button" disabled>${text.cleanSelected}</button>
           </div>
           <div class="disk-meta">${text.diskHint}</div>
@@ -452,6 +463,7 @@
   const diskList = root.querySelector('.disk-list')
   const cleanBtn = root.querySelector('.clean-btn')
   const diskMeta = root.querySelector('.disk-meta')
+  const thresholdInput = root.querySelector('.disk-threshold-input')
   const balanceView = root.querySelector('.balance-view')
   const usageView = root.querySelector('.usage-view')
   const total = root.querySelector('.total')
@@ -478,7 +490,7 @@
   const state = {
     open: false, tab: 'balance', days: 1,
     loading: false, data: null, usage: null, usageLoading: false,
-    disk: null, diskLoading: false, selected: new Set(), cleanConfirm: false, cleanResult: '',
+    disk: null, diskLoading: false, selected: new Set(), cleanConfirm: false, cleanResult: '', diskThreshold: null,
     update: null, updatePhase: 'idle', updateError: '',
   }
 
@@ -890,9 +902,10 @@
       diskMeta.textContent = text.scanning
       return
     }
-    const thresholdGB = Number(disk.thresholdGB) || 3
+    const thresholdGB = Number(state.diskThreshold) || Number(disk.thresholdGB) || 3
+    if (thresholdInput && document.activeElement !== thresholdInput) thresholdInput.value = String(thresholdGB)
     const threshold = thresholdGB * 1073741824
-    const items = (disk.items || []).filter(item => item.safe || item.size >= threshold)
+    const items = (disk.items || [])
     if (items.length === 0) {
       const empty = document.createElement('div')
       empty.className = 'disk-meta'
@@ -982,6 +995,11 @@
     await loadDisk(true)
     renderSpace()
   }
+
+  try {
+    const savedThreshold = Number(localStorage.getItem('quotapot.diskThresholdGB'))
+    if (Number.isFinite(savedThreshold) && savedThreshold > 0) state.diskThreshold = savedThreshold
+  } catch { /* storage may be unavailable */ }
 
   let breaching = false
   let running = false
@@ -1242,6 +1260,14 @@
   cleanBtn.addEventListener('click', (event) => {
     event.stopPropagation()
     cleanSelected()
+  })
+
+  thresholdInput.addEventListener('change', (event) => {
+    event.stopPropagation()
+    const value = Math.max(1, Number(thresholdInput.value) || 3)
+    state.diskThreshold = value
+    try { localStorage.setItem('quotapot.diskThresholdGB', String(value)) } catch { /* ignore */ }
+    renderSpace()
   })
 
   tabs.forEach(tab => {

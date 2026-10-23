@@ -11,11 +11,19 @@ let refreshing = false
 
 function settings() {
   const config = vscode.workspace.getConfiguration('quotapot')
+  const number = (key, fallback) => {
+    const value = Number(config.get(key, fallback))
+    return Number.isFinite(value) ? value : fallback
+  }
   return {
     deepseekBaseUrl: config.get('deepseekBaseUrl', 'https://api.deepseek.com'),
     cursorBaseUrl: config.get('cursorBaseUrl', 'https://api2.cursor.sh'),
-    refreshSeconds: Math.max(30, Number(config.get('refreshSeconds', 120)) || 120),
+    refreshSeconds: Math.max(30, number('refreshSeconds', 120)),
     statusBar: config.get('statusBar', 'all'),
+    deepseekLowBalance: Math.max(0, number('deepseekLowBalance', 5)),
+    cursorWarningPercent: Math.min(100, Math.max(0, number('cursorWarningPercent', 80))),
+    codexWarningPercent: Math.min(100, Math.max(0, number('codexWarningPercent', 80))),
+    dailyTokenLimit: Math.max(0, number('dailyTokenLimit', 0)),
   }
 }
 
@@ -39,7 +47,7 @@ function cursorPercent(cursor) {
   return 0
 }
 
-function statusText(data) {
+function statusText(data, warnings = {}) {
   const mode = settings().statusBar
   const parts = []
   if (mode === 'all' || mode === 'balance') {
@@ -68,7 +76,7 @@ function statusText(data) {
       parts.push('X !')
     }
   }
-  return `$(dashboard) QuotaPot ${parts.join(' · ')}`
+  return `$(dashboard) QuotaPot ${parts.join(' · ')}${Object.values(warnings).some(Boolean) ? ' !' : ''}`
 }
 
 function tooltip(data) {
@@ -100,7 +108,14 @@ function tooltip(data) {
   } else {
     lines.push('', `Codex: ${data.codex?.error || 'unavailable'}`)
   }
-  lines.push('', 'Click to open the panel.')
+  if (data.warnings && Object.values(data.warnings).some(Boolean)) {
+    const reached = []
+    if (data.warnings.balance) reached.push(`DeepSeek below ${settings().deepseekLowBalance}`)
+    if (data.warnings.cursor) reached.push(`Cursor at/over ${settings().cursorWarningPercent}%`)
+    if (data.warnings.codex) reached.push(`Codex at/over its threshold`)
+    lines.push('', `⚠ ${reached.join(' · ')}`)
+  }
+  lines.push('', 'Click to open the side bar. Use **QuotaPot: Open in Editor** for a wide view.')
   return new vscode.MarkdownString(lines.join('\n'))
 }
 
@@ -121,12 +136,31 @@ async function refresh(context, { force = false } = {}) {
       baseUrl: config.deepseekBaseUrl,
       cursorBaseUrl: config.cursorBaseUrl,
     })
+    const cursorPct = data.cursor && data.cursor.ok ? cursorPercent(data.cursor) : 0
+    const codexPct = Math.max(
+      Number(data.codex && data.codex.limit && data.codex.limit.primary && data.codex.limit.primary.used_percent) || 0,
+      Number(data.codex && data.codex.limit && data.codex.limit.secondary && data.codex.limit.secondary.used_percent) || 0,
+    )
+    data.warnings = {
+      balance: config.deepseekLowBalance > 0 && Boolean(data.balance && data.balance.ok && data.balance.balances.some(item => item.total < config.deepseekLowBalance)),
+      cursor: Boolean(data.cursor && data.cursor.ok && cursorPct >= config.cursorWarningPercent),
+      codex: Boolean(data.codex && data.codex.ok && (codexPct >= config.codexWarningPercent || (config.dailyTokenLimit > 0 && data.codex.today >= config.dailyTokenLimit))),
+    }
+    data.config = {
+      deepseekLowBalance: config.deepseekLowBalance,
+      cursorWarningPercent: config.cursorWarningPercent,
+      codexWarningPercent: config.codexWarningPercent,
+      dailyTokenLimit: config.dailyTokenLimit,
+    }
     lastData = data
     if (statusItem) {
-      statusItem.text = statusText(data)
+      const warn = Object.values(data.warnings).some(Boolean)
+      statusItem.text = statusText(data, data.warnings)
       statusItem.tooltip = tooltip(data)
+      statusItem.color = warn ? new vscode.ThemeColor('statusBarItem.warningForeground') : undefined
+      statusItem.backgroundColor = warn ? new vscode.ThemeColor('statusBarItem.warningBackground') : undefined
     }
-    if (panel) panel.webview.postMessage({ type: 'data', data })
+    postData(data)
     return data
   } catch (error) {
     if (statusItem) {
@@ -143,7 +177,23 @@ function openDashboard() {
   vscode.env.openExternal(vscode.Uri.parse('https://cursor.com/dashboard?tab=usage'))
 }
 
-function panelHtml() {
+function openSettings() {
+  vscode.commands.executeCommand('workbench.action.openSettings', '@ext:caffrey-li.quotapot')
+}
+
+function postData(data) {
+  if (panel) panel.webview.postMessage({ type: 'data', data })
+  if (viewProvider && viewProvider.view) viewProvider.view.webview.postMessage({ type: 'data', data })
+}
+
+function handleMessage(message, context) {
+  if (!message) return
+  if (message.type === 'refresh') refresh(context, { force: true })
+  else if (message.type === 'dashboard') openDashboard()
+  else if (message.type === 'settings') openSettings()
+}
+
+function panelHtml(sidebar = false) {
   return `<!doctype html>
 <html lang="zh">
 <head>
@@ -153,14 +203,18 @@ function panelHtml() {
   :root { color-scheme: light dark; }
   body { font-family: var(--vscode-font-family); color: var(--vscode-foreground); background: var(--vscode-editor-background); margin: 0; padding: 20px; }
   .wrap { max-width: 760px; margin: 0 auto; }
-  header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+  .actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
   h1 { font-size: 18px; margin: 0; font-weight: 600; letter-spacing: .2px; }
   button { font: inherit; color: var(--vscode-button-foreground); background: var(--vscode-button-background); border: 0; border-radius: 6px; padding: 6px 12px; cursor: pointer; }
   button.secondary { color: var(--vscode-button-secondaryForeground); background: var(--vscode-button-secondaryBackground); }
   .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+  .sidebar .grid { grid-template-columns: 1fr; }
+  .sidebar .sea { height: 112px; }
   .card { border: 1px solid var(--vscode-panel-border); border-radius: 12px; padding: 14px 16px; background: var(--vscode-sideBar-background); }
   .card h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .8px; opacity: .65; margin: 0 0 10px; }
   .big { font-size: 24px; font-weight: 650; font-variant-numeric: tabular-nums; }
+  .big.warn { color: var(--vscode-errorForeground); }
   .muted { opacity: .65; font-size: 12px; line-height: 1.6; margin-top: 6px; }
   .warn { color: var(--vscode-errorForeground); font-size: 12px; line-height: 1.6; }
   .row { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; padding: 3px 0; }
@@ -215,15 +269,22 @@ function panelHtml() {
     0% { opacity: .95; transform: scale(.4); }
     100% { opacity: 0; transform: scale(1.8); }
   }
+  @media (max-width: 480px) {
+    body { padding: 12px; }
+    .grid { grid-template-columns: 1fr; }
+    .card { padding: 12px; }
+    .big { font-size: 20px; }
+    .sea { height: 112px; }
+  }
   @media (prefers-reduced-motion: reduce) {
     .pet .whale, .wave, .pet .spout { animation: none !important; }
   }
   footer { margin-top: 16px; font-size: 11px; opacity: .55; line-height: 1.6; }
 </style>
 </head>
-<body>
+<body class="${sidebar ? 'sidebar' : ''}">
 <div class="wrap">
-  <header><h1>QuotaPot</h1><div><button id="refresh">Refresh</button> <button id="dashboard" class="secondary">Cursor dashboard</button></div></header>
+  <header><h1>QuotaPot</h1><div class="actions"><button id="settings" class="secondary" title="Thresholds">⚙</button> <button id="refresh">Refresh</button> <button id="dashboard" class="secondary">Dashboard</button></div></header>
   <section class="hero" aria-label="QuotaPot whale">
     <div class="sea">
       <svg class="wave back" viewBox="0 0 200 14" preserveAspectRatio="none" aria-hidden="true">
@@ -363,10 +424,14 @@ function panelHtml() {
       $('codex').textContent = '—'
       $('codex-meta').innerHTML = '<span class="warn">' + (codex && codex.error ? codex.error : 'No local Codex sessions') + '</span>'
     }
+    $('balance').classList.toggle('warn', !!(data.warnings && data.warnings.balance))
+    $('cursor').classList.toggle('warn', !!(data.warnings && data.warnings.cursor))
+    $('codex').classList.toggle('warn', !!(data.warnings && data.warnings.codex))
     $('footer').textContent = 'Updated ' + new Date(data.updatedAt || Date.now()).toLocaleTimeString() + ' · Cursor usage uses an unofficial dashboard API · Codex numbers come from local session files.'
   }
   window.addEventListener('message', event => { if (event.data && event.data.type === 'data') render(event.data.data) })
   $('refresh').addEventListener('click', () => vscode.postMessage({ type: 'refresh' }))
+  $('settings').addEventListener('click', () => vscode.postMessage({ type: 'settings' }))
   $('dashboard').addEventListener('click', () => vscode.postMessage({ type: 'dashboard' }))
   vscode.postMessage({ type: 'refresh' })
 
@@ -480,11 +545,7 @@ function showPanel(context) {
     retainContextWhenHidden: true,
   })
   panel.webview.html = panelHtml()
-  panel.webview.onDidReceiveMessage(message => {
-    if (!message) return
-    if (message.type === 'refresh') refresh(context, { force: true })
-    else if (message.type === 'dashboard') openDashboard()
-  }, null, context.subscriptions)
+  panel.webview.onDidReceiveMessage(message => handleMessage(message, context), null, context.subscriptions)
   panel.onDidDispose(() => { panel = null })
   if (lastData) panel.webview.postMessage({ type: 'data', data: lastData })
   else refresh(context, { force: true })
@@ -503,7 +564,32 @@ async function setApiKey(context) {
   refresh(context, { force: true })
 }
 
+class QuotaPotViewProvider {
+  constructor(context) {
+    this.context = context
+    this.view = null
+  }
+
+  resolveWebviewView(view) {
+    this.view = view
+    view.webview.options = { enableScripts: true }
+    view.webview.html = panelHtml(true)
+    view.webview.onDidReceiveMessage(message => handleMessage(message, this.context), null, this.context.subscriptions)
+    view.onDidChangeVisibility(() => {
+      if (view.visible) refresh(this.context)
+    })
+    if (lastData) view.webview.postMessage({ type: 'data', data: lastData })
+    else refresh(this.context, { force: true })
+  }
+}
+
+let viewProvider = null
+
 function activate(context) {
+  viewProvider = new QuotaPotViewProvider(context)
+  context.subscriptions.push(vscode.window.registerWebviewViewProvider('quotapot.view', viewProvider, {
+    webviewOptions: { retainContextWhenHidden: true },
+  }))
   statusItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100)
   statusItem.command = 'quotapot.open'
   statusItem.text = '$(sync~spin) QuotaPot'
@@ -511,7 +597,9 @@ function activate(context) {
   statusItem.show()
   context.subscriptions.push(statusItem)
   context.subscriptions.push(
-    vscode.commands.registerCommand('quotapot.open', () => showPanel(context)),
+    vscode.commands.registerCommand('quotapot.open', () => vscode.commands.executeCommand('quotapot.view.focus')),
+    vscode.commands.registerCommand('quotapot.openEditor', () => showPanel(context)),
+    vscode.commands.registerCommand('quotapot.openSettings', openSettings),
     vscode.commands.registerCommand('quotapot.refresh', () => refresh(context, { force: true })),
     vscode.commands.registerCommand('quotapot.setApiKey', () => setApiKey(context)),
     vscode.commands.registerCommand('quotapot.openCursorDashboard', openDashboard),
