@@ -3,7 +3,17 @@
 > DeepSeek 余额、Cursor / Codex / WorkBuddy / ZCode 用量，加上一只小鲸鱼。  
 > 一个仓库，三种安装形态：DSH 插件、Cursor/VS Code 扩展、MCP 插件。
 
-![QuotaPot](docs/screenshot.png)
+<p align="center">
+  <a href="docs/screenshot.png"><img src="docs/screenshot.png" height="560" alt="DSH"></a>
+  <a href="docs/screenshot-cursor.png"><img src="docs/screenshot-cursor.png" height="560" alt="Cursor"></a>
+</p>
+<p align="center"><sub>DSH 网页胶囊 · Cursor 侧栏（扩展 webview）</sub></p>
+
+<p align="center">
+  <a href="docs/screenshot-mcp.png"><img src="docs/screenshot-mcp.png" width="760" alt="MCP"></a>
+</p>
+<p align="center"><sub>WorkBuddy / Claude Desktop / ZCode / Codex：同一个 MCP 工具返回，没有独立面板</sub></p>
+<p align="center"><sub>截图使用示例数据</sub></p>
 
 ## 功能
 

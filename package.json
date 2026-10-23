@@ -45,7 +45,9 @@
     "docs/CONFIG.md",
     "docs/CONFIG.en.md",
     "docs/TROUBLESHOOTING.md",
-    "docs/TROUBLESHOOTING.en.md"
+    "docs/TROUBLESHOOTING.en.md",
+    "docs/screenshot-cursor.png",
+    "docs/screenshot-mcp.png"
   ],
   "peerDependencies": {
     "@deepseek-ai/cordis": ">=0.1.0-rc.5",

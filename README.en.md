@@ -3,7 +3,17 @@
 > DeepSeek balance, Cursor / Codex / WorkBuddy / ZCode usage, and a whale.  
 > One repository, three installable forms: a DSH plugin, a Cursor/VS Code extension, and an MCP plugin.
 
-![QuotaPot](docs/screenshot.png)
+<p align="center">
+  <a href="docs/screenshot.png"><img src="docs/screenshot.png" height="560" alt="DSH"></a>
+  <a href="docs/screenshot-cursor.png"><img src="docs/screenshot-cursor.png" height="560" alt="Cursor"></a>
+</p>
+<p align="center"><sub>DSH web pill · Cursor side bar (extension webview)</sub></p>
+
+<p align="center">
+  <a href="docs/screenshot-mcp.png"><img src="docs/screenshot-mcp.png" width="760" alt="MCP"></a>
+</p>
+<p align="center"><sub>WorkBuddy / Claude Desktop / ZCode / Codex: one shared MCP tool result, no separate panel</sub></p>
+<p align="center"><sub>Screenshots use sample data</sub></p>
 
 ## Features
 
