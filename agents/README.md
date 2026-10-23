@@ -1,5 +1,7 @@
 # QuotaPot for Cursor and Codex
 
+![QuotaPot whale in Cursor](cursor-preview.png)
+
 Two hosts, one shared core. The DSH web plugin in the repository root is unchanged.
 
 ## Cursor
