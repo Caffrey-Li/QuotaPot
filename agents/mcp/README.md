@@ -7,7 +7,7 @@ Tools: `quotapot_status`, `quotapot_balance`, `quotapot_cursor_usage`, `quotapot
 Install from the repository (no npm account needed):
 
 ```sh
-npx -y --package github:Caffrey-Li/dsh-bot-QuotaPot#v0.4.0 quotapot-mcp
+npx -y --package https://github.com/Caffrey-Li/dsh-bot-QuotaPot/releases/download/v0.4.1/dsh-bot-quotapot-mcp-0.4.1.tgz quotapot-mcp
 ```
 
 For a local clone:

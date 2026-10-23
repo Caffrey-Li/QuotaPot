@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.1 — 2026-10-23
+
+- MCP host templates and docs now install the server from the release asset URL
+  instead of GitHub's git endpoint. This avoids `HTTP2 framing` / git timeouts
+  on restricted networks.
+- Added generated release notes to the tag workflow.
+- No host UI changes; Cursor extension remains 0.2.0.
+
 ## 0.4.0 — 2026-10-23
 
 - Added a portable MCP server (`agents/mcp`) with a GitHub `bin`, installable

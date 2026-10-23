@@ -36,8 +36,9 @@ jobs:
           mkdir -p dist/agents
           cp -R agents/mcp agents/templates agents/README.md dist/agents/
           cp agents/cursor-extension/quotapot-0.2.0.vsix dist/agents/
-          cd dist && zip -qr quotapot-agents-0.4.0.zip agents
+          cd dist && zip -qr quotapot-agents-0.4.1.zip agents
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
           files: dist/*
+          generate_release_notes: true

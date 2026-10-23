@@ -1,6 +1,6 @@
 {
   "name": "dsh-bot-quotapot",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "QuotaPot: DeepSeek balance, multi-agent usage and a whale pet, shipped as a DSH plugin, a Cursor/VS Code extension and an MCP server for WorkBuddy, Claude, ZCode and Codex.",
   "type": "module",
   "main": "index.js",

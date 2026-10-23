@@ -3,7 +3,7 @@
   "plugins": [
     {
       "name": "quotapot",
-      "version": "0.4.0",
+      "version": "0.4.1",
       "source": "filesystem",
       "cachePath": "__PLUGIN_DIR__",
       "description": "DeepSeek balance, multi-agent usage and per-model stats.",

@@ -23,7 +23,7 @@ Tools:
 The server is `agents/mcp/server.cjs`. The portable command used by all templates is:
 
 ```sh
-npx -y --package github:Caffrey-Li/dsh-bot-QuotaPot#v0.4.0 quotapot-mcp
+npx -y --package https://github.com/Caffrey-Li/dsh-bot-QuotaPot/releases/download/v0.4.1/dsh-bot-quotapot-mcp-0.4.1.tgz quotapot-mcp
 ```
 
 First launch downloads the package. If the host has a short MCP startup timeout, set it to 60 seconds. Offline users can clone the repo and run `node /ABSOLUTE/PATH/agents/mcp/server.cjs`.

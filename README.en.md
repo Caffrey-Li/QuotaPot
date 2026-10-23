@@ -43,7 +43,7 @@ MCP tools: `quotapot_status`, `quotapot_balance`, `quotapot_cursor_usage`, `quot
 Portable command used by every MCP template:
 
 ```sh
-npx -y --package github:Caffrey-Li/dsh-bot-QuotaPot#v0.4.0 quotapot-mcp
+npx -y --package https://github.com/Caffrey-Li/dsh-bot-QuotaPot/releases/download/v0.4.1/dsh-bot-quotapot-mcp-0.4.1.tgz quotapot-mcp
 ```
 
 Host templates: [agents/templates](agents/templates). Full matrix: [agents/README.md](agents/README.md).
@@ -57,7 +57,7 @@ Host templates: [agents/templates](agents/templates). Full matrix: [agents/READM
 Open **Settings → Plugins → Add plugin**, then enter:
 
 ```text
-github:Caffrey-Li/dsh-bot-QuotaPot#v0.4.0
+github:Caffrey-Li/dsh-bot-QuotaPot#v0.4.1
 ```
 
 After the npm release is published, you can use the package name instead:
@@ -71,7 +71,7 @@ Restart DSH completely if it says the change takes effect at the next start.
 ### 2. CLI (DSH Web profile)
 
 ```sh
-npx @deepseek-ai/dsh@0.2.0-rc.2 plugin --profile web add github:Caffrey-Li/dsh-bot-QuotaPot#v0.4.0
+npx @deepseek-ai/dsh@0.2.0-rc.2 plugin --profile web add github:Caffrey-Li/dsh-bot-QuotaPot#v0.4.1
 npx @deepseek-ai/dsh@0.2.0-rc.2 web
 ```
 
@@ -79,7 +79,7 @@ npx @deepseek-ai/dsh@0.2.0-rc.2 web
 
 ### 3. Offline `.tgz`
 
-Download `dsh-bot-quotapot-0.4.0.tgz` from [Releases](https://github.com/Caffrey-Li/dsh-bot-QuotaPot/releases) and install it from the Plugins page.
+Download `dsh-bot-quotapot-0.4.1.tgz` from [Releases](https://github.com/Caffrey-Li/dsh-bot-QuotaPot/releases) and install it from the Plugins page.
 
 ## Configuration
 

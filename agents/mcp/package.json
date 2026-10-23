@@ -1,11 +1,17 @@
 {
   "name": "dsh-bot-quotapot-mcp",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "QuotaPot MCP server for WorkBuddy, Claude Desktop, ZCode and Codex.",
   "type": "commonjs",
-  "bin": { "quotapot-mcp": "./server.cjs" },
+  "bin": {
+    "quotapot-mcp": "./server.cjs"
+  },
   "main": "./server.cjs",
-  "files": ["server.cjs", "core.cjs", "README.md"],
+  "files": [
+    "server.cjs",
+    "core.cjs",
+    "README.md"
+  ],
   "license": "MIT",
   "author": "Caffrey-Li",
   "repository": {

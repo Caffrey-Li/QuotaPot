@@ -49,7 +49,13 @@ MCP 工具：
 - `quotapot_codex_usage`
 - `quotapot_usage_models`（按模型统计 today / 7d / 30d）
 
-MCP 宿主的配置模板在 [agents/templates](agents/templates)，完整说明在 [agents/README.md](agents/README.md)。
+MCP 宿主直接安装（使用 Release 资产，不依赖 GitHub git 通道）：
+
+```sh
+npx -y --package https://github.com/Caffrey-Li/dsh-bot-QuotaPot/releases/download/v0.4.1/dsh-bot-quotapot-mcp-0.4.1.tgz quotapot-mcp
+```
+
+配置模板在 [agents/templates](agents/templates)，完整说明在 [agents/README.md](agents/README.md)。
 
 > Cursor 用量来自未公开的 `api2.cursor.sh`；Codex 只统计本地 `token_count`；WorkBuddy 是 credits 不是 token；ZCode 只有套餐资格；Claude/Trae 桌面版没有本地用量。Trae 需要标准 Trae IDE，TRAE SOLO CN 不支持第三方插件。
 
@@ -63,7 +69,7 @@ MCP 宿主的配置模板在 [agents/templates](agents/templates)，完整说明
 打开 **设置 → 插件 → 添加插件**，在“包名或地址”里填：
 
 ```text
-github:Caffrey-Li/dsh-bot-QuotaPot#v0.4.0
+github:Caffrey-Li/dsh-bot-QuotaPot#v0.4.1
 ```
 
 或者，等 npm 发布后直接填包名：
@@ -77,7 +83,7 @@ dsh-bot-quotapot
 ### 方式二：命令行（DSH Web profile）
 
 ```sh
-npx @deepseek-ai/dsh@0.2.0-rc.2 plugin --profile web add github:Caffrey-Li/dsh-bot-QuotaPot#v0.4.0
+npx @deepseek-ai/dsh@0.2.0-rc.2 plugin --profile web add github:Caffrey-Li/dsh-bot-QuotaPot#v0.4.1
 npx @deepseek-ai/dsh@0.2.0-rc.2 web
 ```
 
@@ -85,7 +91,7 @@ npx @deepseek-ai/dsh@0.2.0-rc.2 web
 
 ### 方式三：离线 `.tgz`
 
-从 [Releases](https://github.com/Caffrey-Li/dsh-bot-QuotaPot/releases) 下载 `dsh-bot-quotapot-0.4.0.tgz`，在插件页面选择本地文件安装。
+从 [Releases](https://github.com/Caffrey-Li/dsh-bot-QuotaPot/releases) 下载 `dsh-bot-quotapot-0.4.1.tgz`，在插件页面选择本地文件安装。
 
 ## 配置
 

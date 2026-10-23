@@ -5,7 +5,7 @@
 const readline = require('node:readline')
 const core = require('./core.cjs')
 
-const VERSION = '0.4.0'
+const VERSION = '0.4.1'
 const TOOLS = [
   {
     name: 'quotapot_status',
