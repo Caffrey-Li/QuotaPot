@@ -1,8 +1,8 @@
 # QuotaPot
 
-> DeepSeek 余额胶囊，常驻 DSH / DS Bot 窗口右下角。余额低了会提醒。
+> DeepSeek 余额胶囊 + 小鲸鱼，同时提供 Cursor/VS Code 扩展和 WorkBuddy/Claude/ZCode/Codex 的 MCP 插件。
 
-QuotaPot 是一个 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（DSH）插件，适用于 **DSH Web、DS Bot 桌面端和 Web 端**。它在界面角落显示一个可拖动的余额胶囊，数据来自 DeepSeek 官方 `GET /user/balance` 接口。
+QuotaPot 是一个多宿主插件：DSH 里是余额胶囊，Cursor/VS Code/Trae 里是扩展，WorkBuddy/Claude/ZCode/Codex 里是 MCP 工具。它在界面角落显示一个可拖动的余额胶囊，数据来自 DeepSeek 官方 `GET /user/balance` 接口。
 
 ![QuotaPot 截图](docs/screenshot.png)
 
@@ -31,16 +31,27 @@ QuotaPot 是一个 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-ha
 
 小鲸鱼是纯 SVG，用径向渐变、高光、环境阴影、轮廓光和接触阴影做出体积感，不依赖图片资源。Bot 运行时它从水面跃出、旋转身体、再扎回水里，入水/出水会溅起水花；浮在水面时偶尔喷水透气。波浪与卡片同宽、位于卡片顶部上方。
 
-## Cursor / Codex 插件
+## 多宿主插件
 
-同一个仓库还包含两个宿主版本，共用 `agents/cursor-extension/core.cjs`：
+同一个仓库提供三种安装形态，共用 `agents/` 下的 core：
 
-- **Cursor 扩展**：状态栏 + 可折叠侧栏（竖排卡片）+ 小鲸鱼；侧栏可拖动、调整宽度，阈值在设置里改。安装包在 `agents/cursor-extension/quotapot-0.2.0.vsix`。
-- **Codex 插件**：Codex 插件机制是 MCP server，提供 `quotapot_status` / `quotapot_balance` / `quotapot_cursor_usage` / `quotapot_codex_usage` 四个工具，没有悬浮 UI。
+| 宿主 | 形态 | 入口 |
+|---|---|---|
+| **DeepSeek Harness / DS Bot** | 网页余额胶囊 + 小鲸鱼 | 本仓库根包 |
+| **Cursor / VS Code / 标准 Trae** | VS Code 扩展（侧栏 + 状态栏 + 鲸鱼） | Release 里的 `quotapot-0.2.0.vsix` |
+| **WorkBuddy / Claude Desktop / ZCode / Codex** | MCP server，无独立 UI | `agents/mcp` / Release 里的 MCP 包 |
 
-详见 [agents/README.md](agents/README.md)。
+MCP 工具：
 
-> Cursor 用量来自未公开的 `api2.cursor.sh` 接口；Codex 用量只统计本地 `~/.codex/sessions` 中记录了 `token_count` 的会话。
+- `quotapot_status`
+- `quotapot_balance`
+- `quotapot_cursor_usage`
+- `quotapot_codex_usage`
+- `quotapot_usage_models`（按模型统计 today / 7d / 30d）
+
+MCP 宿主的配置模板在 [agents/templates](agents/templates)，完整说明在 [agents/README.md](agents/README.md)。
+
+> Cursor 用量来自未公开的 `api2.cursor.sh`；Codex 只统计本地 `token_count`；WorkBuddy 是 credits 不是 token；ZCode 只有套餐资格；Claude/Trae 桌面版没有本地用量。Trae 需要标准 Trae IDE，TRAE SOLO CN 不支持第三方插件。
 
 
 ## 安装
@@ -52,7 +63,7 @@ QuotaPot 是一个 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-ha
 打开 **设置 → 插件 → 添加插件**，在“包名或地址”里填：
 
 ```text
-github:Caffrey-Li/dsh-bot-QuotaPot#v0.3.2
+github:Caffrey-Li/dsh-bot-QuotaPot#v0.4.0
 ```
 
 或者，等 npm 发布后直接填包名：
@@ -66,7 +77,7 @@ dsh-bot-quotapot
 ### 方式二：命令行（DSH Web profile）
 
 ```sh
-npx @deepseek-ai/dsh@0.2.0-rc.2 plugin --profile web add github:Caffrey-Li/dsh-bot-QuotaPot#v0.3.2
+npx @deepseek-ai/dsh@0.2.0-rc.2 plugin --profile web add github:Caffrey-Li/dsh-bot-QuotaPot#v0.4.0
 npx @deepseek-ai/dsh@0.2.0-rc.2 web
 ```
 
@@ -74,7 +85,7 @@ npx @deepseek-ai/dsh@0.2.0-rc.2 web
 
 ### 方式三：离线 `.tgz`
 
-从 [Releases](https://github.com/Caffrey-Li/dsh-bot-QuotaPot/releases) 下载 `dsh-bot-quotapot-0.3.2.tgz`，在插件页面选择本地文件安装。
+从 [Releases](https://github.com/Caffrey-Li/dsh-bot-QuotaPot/releases) 下载 `dsh-bot-quotapot-0.4.0.tgz`，在插件页面选择本地文件安装。
 
 ## 配置
 

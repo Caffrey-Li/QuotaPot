@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "quotapot": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "--package",
+        "github:Caffrey-Li/dsh-bot-QuotaPot#v0.4.0",
+        "quotapot-mcp"
+      ],
+      "env": {}
+    }
+  }
+}

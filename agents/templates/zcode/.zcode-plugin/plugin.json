@@ -1,0 +1,20 @@
+{
+  "name": "quotapot",
+  "version": "0.4.0",
+  "description": "DeepSeek balance, Cursor/Codex/WorkBuddy usage and per-model stats inside ZCode.",
+  "author": { "name": "Caffrey-Li" },
+  "license": "MIT",
+  "mcpServers": {
+    "quotapot": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "--package",
+        "github:Caffrey-Li/dsh-bot-QuotaPot#v0.4.0",
+        "quotapot-mcp"
+      ],
+      "env": {}
+    }
+  }
+}

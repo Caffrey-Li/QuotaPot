@@ -1,7 +1,7 @@
 {
   "name": "quotapot",
   "displayName": "QuotaPot",
-  "description": "DeepSeek balance, Cursor usage and Codex usage in the Cursor status bar.",
+  "description": "QuotaPot: DeepSeek balance, Cursor usage, Codex usage and the QuotaPot whale for Cursor, VS Code and Trae.",
   "version": "0.2.0",
   "publisher": "caffrey-li",
   "license": "MIT",

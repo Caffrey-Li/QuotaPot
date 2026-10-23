@@ -28,6 +28,26 @@ QuotaPot is a [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness
 
 The whale is pure SVG: a radial gradient, specular highlight, ambient shadow, rim light and contact shadow give it volume, with no image assets. While a Bot turn runs it breaches out of the water, rotates, and dives back with a splash; it floats at the surface and spouts between breaches. The wave is card-width and sits above the card's top edge.
 
+## Multi-host plugins
+
+One repository, three installable forms:
+
+| Host | Form | Entry |
+|---|---|---|
+| DeepSeek Harness / DS Bot | web pill + whale | root package |
+| Cursor / VS Code / standard Trae | VS Code extension | `quotapot-0.2.0.vsix` release asset |
+| WorkBuddy / Claude Desktop / ZCode / Codex | MCP server | `agents/mcp` or `npx` |
+
+MCP tools: `quotapot_status`, `quotapot_balance`, `quotapot_cursor_usage`, `quotapot_codex_usage`, `quotapot_usage_models` (per-model today / 7d / 30d).
+
+Portable command used by every MCP template:
+
+```sh
+npx -y --package github:Caffrey-Li/dsh-bot-QuotaPot#v0.4.0 quotapot-mcp
+```
+
+Host templates: [agents/templates](agents/templates). Full matrix: [agents/README.md](agents/README.md).
+
 ## Install
 
 > Requires DSH `0.2.0-rc.2` or newer and Node `22.19+`.
@@ -37,7 +57,7 @@ The whale is pure SVG: a radial gradient, specular highlight, ambient shadow, ri
 Open **Settings → Plugins → Add plugin**, then enter:
 
 ```text
-github:Caffrey-Li/dsh-bot-QuotaPot#v0.3.2
+github:Caffrey-Li/dsh-bot-QuotaPot#v0.4.0
 ```
 
 After the npm release is published, you can use the package name instead:
@@ -51,7 +71,7 @@ Restart DSH completely if it says the change takes effect at the next start.
 ### 2. CLI (DSH Web profile)
 
 ```sh
-npx @deepseek-ai/dsh@0.2.0-rc.2 plugin --profile web add github:Caffrey-Li/dsh-bot-QuotaPot#v0.3.2
+npx @deepseek-ai/dsh@0.2.0-rc.2 plugin --profile web add github:Caffrey-Li/dsh-bot-QuotaPot#v0.4.0
 npx @deepseek-ai/dsh@0.2.0-rc.2 web
 ```
 
@@ -59,7 +79,7 @@ npx @deepseek-ai/dsh@0.2.0-rc.2 web
 
 ### 3. Offline `.tgz`
 
-Download `dsh-bot-quotapot-0.3.2.tgz` from [Releases](https://github.com/Caffrey-Li/dsh-bot-QuotaPot/releases) and install it from the Plugins page.
+Download `dsh-bot-quotapot-0.4.0.tgz` from [Releases](https://github.com/Caffrey-Li/dsh-bot-QuotaPot/releases) and install it from the Plugins page.
 
 ## Configuration
 

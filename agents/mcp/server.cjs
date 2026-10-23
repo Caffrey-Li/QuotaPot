@@ -1,10 +1,11 @@
+#!/usr/bin/env node
 'use strict'
 
 // Codex plugin: a minimal MCP stdio server exposing QuotaPot data as tools.
 const readline = require('node:readline')
 const core = require('./core.cjs')
 
-const VERSION = '0.1.0'
+const VERSION = '0.4.0'
 const TOOLS = [
   {
     name: 'quotapot_status',

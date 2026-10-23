@@ -1,20 +1,15 @@
 {
   "mcpServers": {
     "quotapot": {
-      "command": "/Users/caffrey/.hermes/node/bin/node",
+      "command": "npx",
       "args": [
-        "./server.cjs"
+        "-y",
+        "--package",
+        "github:Caffrey-Li/dsh-bot-QuotaPot#v0.4.0",
+        "quotapot-mcp"
       ],
-      "cwd": ".",
-      "enabled": true,
-      "env_vars": [
-        "DEEPSEEK_API_KEY",
-        "DEEPSEEK_BASE_URL",
-        "CURSOR_API_BASE_URL",
-        "HOME",
-        "PATH"
-      ],
-      "startup_timeout_sec": 10,
+      "env": {},
+      "startup_timeout_sec": 60,
       "tool_timeout_sec": 60
     }
   }

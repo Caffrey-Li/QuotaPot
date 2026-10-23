@@ -1,0 +1,15 @@
+{
+  "name": "quotapot-local",
+  "plugins": [
+    {
+      "name": "quotapot",
+      "version": "0.4.0",
+      "source": "filesystem",
+      "cachePath": "__PLUGIN_DIR__",
+      "description": "DeepSeek balance, multi-agent usage and per-model stats.",
+      "displayName": "QuotaPot",
+      "category": "developer-tools",
+      "author": { "name": "Caffrey-Li" }
+    }
+  ]
+}

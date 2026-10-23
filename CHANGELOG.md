@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4.0 — 2026-10-23
+
+- Added a portable MCP server (`agents/mcp`) with a GitHub `bin`, installable
+  with `npx --package github:Caffrey-Li/dsh-bot-QuotaPot#v0.4.0 quotapot-mcp`.
+- Added host config templates for WorkBuddy, Claude Desktop, ZCode and Codex;
+  no local absolute paths are required.
+- Added `quotapot_usage_models` for per-model DSH/Codex tokens and WorkBuddy
+  credits.
+- Cursor extension 0.2.0 is a release asset for Cursor / VS Code / standard Trae.
+- The repository now has a release workflow that builds the tarballs and VSIX.
+
 ## 0.3.2 — 2026-10-23
 
 - Added WorkBuddy credits, ZCode plan entitlement, and an explicit "no local

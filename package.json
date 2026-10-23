@@ -1,7 +1,7 @@
 {
   "name": "dsh-bot-quotapot",
-  "version": "0.3.2",
-  "description": "QuotaPot: a floating DeepSeek balance and token-usage pill for DeepSeek Harness (DSH) and DS Bot, with daily token limits, session spans and multi-currency support.",
+  "version": "0.4.0",
+  "description": "QuotaPot: DeepSeek balance, multi-agent usage and a whale pet, shipped as a DSH plugin, a Cursor/VS Code extension and an MCP server for WorkBuddy, Claude, ZCode and Codex.",
   "type": "module",
   "main": "index.js",
   "license": "MIT",
@@ -38,7 +38,10 @@
     "docs/screenshot-usage.png",
     "docs/screenshot-space.png",
     "docs/screenshot-agents.png",
-    "docs/pet-closeup.png"
+    "docs/pet-closeup.png",
+    "agents/mcp/server.cjs",
+    "agents/mcp/core.cjs",
+    "agents/templates"
   ],
   "peerDependencies": {
     "@deepseek-ai/cordis": ">=0.1.0-rc.5",
@@ -68,5 +71,8 @@
   "scripts": {
     "test": "node --test",
     "check": "node --check index.js && node --check widget.js && node --test"
+  },
+  "bin": {
+    "quotapot-mcp": "agents/mcp/server.cjs"
   }
 }
