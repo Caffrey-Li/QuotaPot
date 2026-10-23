@@ -14,9 +14,10 @@
   const position = ['bottom-right', 'bottom-left', 'top-right', 'top-left'].includes(config.position)
     ? config.position
     : 'bottom-right'
-  const locale = config.locale === 'zh' || (config.locale === 'auto' && String(navigator.language || '').toLowerCase().startsWith('zh'))
-    ? 'zh'
-    : 'en'
+  const htmlLang = String(document.documentElement?.lang || '').toLowerCase()
+  const browserLang = String(navigator.language || '').toLowerCase()
+  const autoZh = htmlLang ? htmlLang.startsWith('zh') : browserLang.startsWith('zh')
+  const locale = config.locale === 'zh' || (config.locale === 'auto' && autoZh) ? 'zh' : 'en'
   const zh = locale === 'zh'
 
   const text = {

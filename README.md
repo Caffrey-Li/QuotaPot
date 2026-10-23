@@ -74,7 +74,7 @@ npx @deepseek-ai/dsh@0.2.0-rc.2 web
 | `refreshSeconds` | `30` | 轮询间隔，限制在 10–600 秒 |
 | `lowBalanceThreshold` | `5` | 低于该金额时提醒；`0` 关闭 |
 | `position` | `bottom-right` | `bottom-right` / `bottom-left` / `top-right` / `top-left` |
-| `locale` | `auto` | `auto` / `zh` / `en` |
+| `locale` | `auto` | `auto` 跟随 DSH 界面语言（`<html lang>`），再回退浏览器语言；或强制 `zh` / `en` |
 
 ## API Key 从哪里来
 

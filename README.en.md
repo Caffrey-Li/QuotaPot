@@ -74,7 +74,7 @@ Everything is optional. Add this to the profile's `cordis.patch.yml`:
 | `refreshSeconds` | `30` | Poll interval, clamped to 10–600 seconds |
 | `lowBalanceThreshold` | `5` | Warn below this amount; `0` disables it |
 | `position` | `bottom-right` | `bottom-right` / `bottom-left` / `top-right` / `top-left` |
-| `locale` | `auto` | `auto` / `zh` / `en` |
+| `locale` | `auto` | `auto` follows the DSH UI language (`<html lang>`), then the browser; or force `zh` / `en` |
 
 ## Where the API key comes from
 
