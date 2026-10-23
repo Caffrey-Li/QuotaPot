@@ -229,11 +229,68 @@ async function codexUsage() {
   }
 }
 
+async function workbuddyUsage() {
+  const db = path.join(os.homedir(), '.workbuddy', 'workbuddy.db')
+  if (!fs.existsSync(db)) throw new Error('NO_WORKBUDDY_DB')
+  const { stdout } = await execFileAsync('sqlite3', [
+    '-json', db,
+    'SELECT session_id, updated_at, credit_json FROM session_usage;',
+  ], { timeout: 15_000, maxBuffer: 8 * 1024 * 1024 })
+  const rows = String(stdout).trim() === '' ? [] : JSON.parse(stdout)
+  const now = Date.now()
+  const todayStart = new Date()
+  todayStart.setHours(0, 0, 0, 0)
+  let total = 0
+  let today = 0
+  let sevenDays = 0
+  let thirtyDays = 0
+  for (const row of rows) {
+    let credits = 0
+    try {
+      const map = JSON.parse(row.credit_json || '{}')
+      for (const value of Object.values(map)) credits += Number(value) || 0
+    } catch { /* skip malformed row */ }
+    total += credits
+    const at = Number(row.updated_at) || 0
+    if (at >= todayStart.getTime()) today += credits
+    if (at >= now - 7 * 86_400_000) sevenDays += credits
+    if (at >= now - 30 * 86_400_000) thirtyDays += credits
+  }
+  return { ok: true, sessions: rows.length, credits: { total, today, sevenDays, thirtyDays } }
+}
+
+const ZCODE_LABELS = {
+  'builtin:zai-start-plan': 'Z.ai Start',
+  'builtin:zai-coding-plan': 'Z.ai Coding',
+  'builtin:bigmodel-coding-plan': 'BigModel Coding',
+  'builtin:bigmodel-start-plan': 'BigModel Start',
+}
+
+async function zcodeStatus() {
+  try {
+    const data = JSON.parse(await fsp.readFile(path.join(os.homedir(), '.zcode', 'v2', 'coding-plan-cache.json'), 'utf8'))
+    const items = (data && data.entryStatus && data.entryStatus.items) || {}
+    const plans = Object.entries(items).map(([id, value]) => ({
+      id,
+      label: ZCODE_LABELS[id] || id,
+      status: value && value.status ? value.status : 'unknown',
+      reason: value && value.reason ? value.reason : null,
+    }))
+    return { ok: true, plans, updatedAt: Number(data && data.entryStatus && data.entryStatus.updatedAt) || null }
+  } catch {
+    return { ok: false, error: 'NO_ZCODE_PLAN' }
+  }
+}
+
 async function status(options = {}) {
-  const [balance, cursor, codex] = await Promise.allSettled([
+  const [balance, cursor, codex, workbuddy, zcode] = await Promise.allSettled([
     deepseekBalance(options),
-    cursorUsage({ baseUrl: options.cursorBaseUrl }),
+    options.cursorEnabled === false
+      ? Promise.resolve({ ok: false, error: 'CURSOR_HOST_ONLY' })
+      : cursorUsage({ baseUrl: options.cursorBaseUrl }),
     codexUsage(),
+    workbuddyUsage(),
+    zcodeStatus(),
   ])
   const wrap = (result, label) => result.status === 'fulfilled'
     ? result.value
@@ -243,6 +300,10 @@ async function status(options = {}) {
     balance: wrap(balance, 'DeepSeek'),
     cursor: wrap(cursor, 'Cursor'),
     codex: wrap(codex, 'Codex'),
+    agents: {
+      workbuddy: wrap(workbuddy, 'WorkBuddy'),
+      zcode: wrap(zcode, 'ZCode'),
+    },
     updatedAt: Date.now(),
   }
 }
@@ -271,4 +332,6 @@ module.exports = {
   formatMoney,
   formatTokens,
   status,
+  workbuddyUsage,
+  zcodeStatus,
 }

@@ -86,6 +86,11 @@
     noDisk: zh ? '未发现 AI 工具目录' : 'No AI tool folders found',
     diskHint: zh ? '阈值只用于高亮，不限制清理；有勾选框的是安全缓存，没有勾选框的是用户数据，删除会丢会话/设置/快照。' : 'The threshold only highlights; it never gates cleanup. Checkboxes are safe caches; uncheckable rows are user data (chats, settings, snapshots).',
     diskThreshold: zh ? '阈值' : 'Threshold',
+    agentsTab: zh ? '工具' : 'Agents',
+    agentsHint: zh ? 'WorkBuddy 读本地 credits；ZCode 只有套餐资格；Claude/Trae 没有本地用量。' : 'WorkBuddy reads local credits; ZCode exposes plan entitlement; Claude/Trae have no local usage.',
+    noLocalUsage: zh ? '无本地用量' : 'No local usage',
+    credits: zh ? 'credits' : 'credits',
+    sessions: zh ? '会话' : 'sessions',
     over: zh ? '超过' : 'over',
   }
 
@@ -270,6 +275,18 @@
         background: transparent; color: inherit; border-radius: 5px; padding: 2px 4px; font: inherit;
         font-variant-numeric: tabular-nums; }
       .disk-threshold input:focus { outline: 1px solid #4d6bfe; outline-offset: 1px; }
+      .agents-list { margin-top: 8px; display: grid; gap: 4px; }
+      .agent-row { padding: 6px 0; border-bottom: 1px solid rgba(120, 120, 128, .08); font-size: 10.5px; }
+      .agent-row:last-child { border-bottom: 0; }
+      .agent-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+      .agent-name { font-weight: 600; color: #3a3a3c; }
+      .agent-big { font-variant-numeric: tabular-nums; font-weight: 650; color: #1c1c1e; }
+      .agent-big.muted { font-weight: 500; color: #8e8e93; font-size: 10px; }
+      .agent-sub { margin-top: 2px; font-size: 9px; color: #8e8e93; line-height: 1.45; }
+      .agent-plan { display: flex; justify-content: space-between; font-size: 9px; color: #8e8e93; padding: 1px 0; }
+      .agent-plan .ok { color: #2f7d32; }
+      .agent-plan .off { color: #b25000; }
+      .agents-meta { margin-top: 7px; font-size: 9.5px; color: #8e8e93; line-height: 1.45; }
       [hidden] { display: none !important; }
       @media (prefers-color-scheme: dark) {
         .pill { background: rgba(28,28,30,.84); color: #f2f2f7; border-color: rgba(255,255,255,.16); }
@@ -297,6 +314,9 @@
         .disk-row { border-bottom-color: rgba(255,255,255,.07); }
         .scan-btn { color: #aab8ff; background: rgba(77,107,254,.22); }
         .disk-threshold input { border-color: rgba(255,255,255,.18); }
+        .agent-name, .agent-big { color: #d1d1d6; }
+        .agent-big.muted { color: #8e8e93; }
+        .agent-row { border-bottom-color: rgba(255,255,255,.07); }
       }
     </style>
     <div class="wrap">
@@ -400,6 +420,7 @@
           <button class="tab active" type="button" role="tab" data-tab="balance" aria-selected="true">${text.balanceTab}</button>
           <button class="tab" type="button" role="tab" data-tab="usage" aria-selected="false">${text.usageTab}</button>
           <button class="tab" type="button" role="tab" data-tab="space" aria-selected="false">${text.spaceTab}</button>
+          <button class="tab" type="button" role="tab" data-tab="agents" aria-selected="false">${text.agentsTab}</button>
         </div>
         <div class="view balance-view">
           <div class="total">--</div>
@@ -439,6 +460,10 @@
           </div>
           <div class="disk-meta">${text.diskHint}</div>
         </div>
+        <div class="view agents-view" hidden>
+          <div class="agents-list"></div>
+          <div class="agents-meta">${text.agentsHint}</div>
+        </div>
       </div>
     </div>
   `
@@ -464,6 +489,9 @@
   const cleanBtn = root.querySelector('.clean-btn')
   const diskMeta = root.querySelector('.disk-meta')
   const thresholdInput = root.querySelector('.disk-threshold-input')
+  const agentsView = root.querySelector('.agents-view')
+  const agentsList = root.querySelector('.agents-list')
+  const agentsMeta = root.querySelector('.agents-meta')
   const balanceView = root.querySelector('.balance-view')
   const usageView = root.querySelector('.usage-view')
   const total = root.querySelector('.total')
@@ -491,6 +519,7 @@
     open: false, tab: 'balance', days: 1,
     loading: false, data: null, usage: null, usageLoading: false,
     disk: null, diskLoading: false, selected: new Set(), cleanConfirm: false, cleanResult: '', diskThreshold: null,
+    agents: null, agentsLoading: false,
     update: null, updatePhase: 'idle', updateError: '',
   }
 
@@ -718,14 +747,16 @@
     balanceView.hidden = state.tab !== 'balance'
     usageView.hidden = state.tab !== 'usage'
     spaceView.hidden = state.tab !== 'space'
+    agentsView.hidden = state.tab !== 'agents'
     panel.classList.toggle('open', state.open)
     pill.setAttribute('aria-expanded', String(state.open))
-    refresh.classList.toggle('spin', state.loading || state.usageLoading || state.diskLoading)
+    refresh.classList.toggle('spin', state.loading || state.usageLoading || state.diskLoading || state.agentsLoading)
     renderPill()
     renderUpdate()
     if (state.tab === 'balance') renderBalance()
     else if (state.tab === 'usage') renderUsage()
-    else renderSpace()
+    else if (state.tab === 'space') renderSpace()
+    else renderAgents()
     requestAnimationFrame(syncPetAnchor)
   }
 
@@ -1001,6 +1032,90 @@
     if (Number.isFinite(savedThreshold) && savedThreshold > 0) state.diskThreshold = savedThreshold
   } catch { /* storage may be unavailable */ }
 
+  async function loadAgents(force = false) {
+    if (state.agentsLoading) return
+    state.agentsLoading = true
+    renderAgents()
+    try {
+      const response = await fetch(`/quotapot/agents${force ? '?fresh=1' : ''}`, {
+        cache: 'no-store',
+        headers: { accept: 'application/json', 'x-quotapot-token': token },
+      })
+      state.agents = response.status === 401 ? { ok: false, error: 'UNAUTHORIZED' } : await response.json()
+    } catch {
+      state.agents = { ok: false, error: 'NETWORK' }
+    }
+    state.agentsLoading = false
+    renderAgents()
+    requestAnimationFrame(syncPetAnchor)
+  }
+
+  function renderAgents() {
+    const data = state.agents
+    agentsList.replaceChildren()
+    if (state.agentsLoading) {
+      agentsMeta.textContent = text.scanning
+      return
+    }
+    if (!data) {
+      agentsMeta.textContent = text.agentsHint
+      return
+    }
+    if (!data.ok) {
+      agentsMeta.textContent = data.error === 'UNAUTHORIZED' ? text.reload : text.scanFailed
+      return
+    }
+    for (const item of data.items || []) {
+      const row = document.createElement('div')
+      row.className = 'agent-row'
+      const head = document.createElement('div')
+      head.className = 'agent-head'
+      const name = document.createElement('span')
+      name.className = 'agent-name'
+      name.textContent = item.name
+      const big = document.createElement('span')
+      big.className = 'agent-big'
+      const sub = document.createElement('div')
+      sub.className = 'agent-sub'
+      if (item.id === 'workbuddy' && item.ok) {
+        const credits = item.credits || {}
+        big.textContent = `${Number(credits.total || 0).toFixed(1)} ${text.credits}`
+        sub.textContent = `${item.sessions} ${text.sessions} · ${text.today} ${Number(credits.today || 0).toFixed(2)} · 7d ${Number(credits.sevenDays || 0).toFixed(2)} · 30d ${Number(credits.thirtyDays || 0).toFixed(2)}`
+        head.append(name, big)
+        row.append(head, sub)
+      } else if (item.id === 'zcode' && item.ok) {
+        const available = (item.plans || []).find(plan => plan.status === 'available')
+        big.textContent = available ? available.label : text.noLocalUsage
+        if (!available) big.classList.add('muted')
+        head.append(name, big)
+        row.append(head)
+        for (const plan of item.plans || []) {
+          const line = document.createElement('div')
+          line.className = 'agent-plan'
+          const left = document.createElement('span')
+          left.textContent = plan.label
+          const right = document.createElement('span')
+          right.className = plan.status === 'available' ? 'ok' : 'off'
+          right.textContent = plan.status === 'available' ? 'available' : (plan.reason || plan.status)
+          line.append(left, right)
+          row.append(line)
+        }
+      } else {
+        big.textContent = text.noLocalUsage
+        big.classList.add('muted')
+        sub.textContent = item.id === 'claude'
+          ? 'Claude desktop has no local token/quota API.'
+          : item.id === 'trae'
+            ? 'Trae local usage is not exposed; install the QuotaPot VSIX there.'
+            : 'No local usage source.'
+        head.append(name, big)
+        row.append(head, sub)
+      }
+      agentsList.append(row)
+    }
+    agentsMeta.textContent = text.agentsHint
+  }
+
   let breaching = false
   let running = false
   let petCardOpen = null
@@ -1243,6 +1358,7 @@
     event.stopPropagation()
     if (state.tab === 'usage') loadUsage(state.days, true)
     else if (state.tab === 'space') { state.cleanResult = ''; loadDisk(true) }
+    else if (state.tab === 'agents') loadAgents(true)
     else loadBalance(true)
   })
 
@@ -1277,6 +1393,7 @@
       render()
       if (state.tab === 'usage') loadUsage(state.days, false)
       else if (state.tab === 'space' && state.disk === null && !state.diskLoading) loadDisk(false)
+      else if (state.tab === 'agents' && state.agents === null && !state.agentsLoading) loadAgents(false)
     })
   })
 

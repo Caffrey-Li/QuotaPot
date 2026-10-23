@@ -28,6 +28,9 @@ const UPDATE_TTL_MS = 6 * 60 * 60_000
 const UPDATE_TIMEOUT_MS = 15_000
 const DISK_CACHE_MS = 60_000
 const DEFAULT_DISK_GB = 3
+const AGENTS_CACHE_MS = 60_000
+const WORKBUDDY_DB = join(homedir(), '.workbuddy', 'workbuddy.db')
+const ZCODE_PLAN = join(homedir(), '.zcode', 'v2', 'coding-plan-cache.json')
 const execFileAsync = promisify(execFile)
 
 let credentialRefFn
@@ -178,7 +181,7 @@ export function aggregateUsage(rows, { since = 0 } = {}) {
   return { owners: list, totals: total }
 }
 
-async function openUsageDb() {
+async function sqliteCtor() {
   if (DatabaseSyncCtor === undefined) {
     try {
       ({ DatabaseSync: DatabaseSyncCtor } = await import('node:sqlite'))
@@ -186,8 +189,21 @@ async function openUsageDb() {
       DatabaseSyncCtor = null
     }
   }
-  if (!DatabaseSyncCtor) return null
-  return new DatabaseSyncCtor(join(DSH_HOME, 'bot', 'usage.sqlite'), { readOnly: true })
+  return DatabaseSyncCtor
+}
+
+async function openSqlite(path) {
+  const Ctor = await sqliteCtor()
+  if (!Ctor) return null
+  try {
+    return new Ctor(path, { readOnly: true })
+  } catch {
+    return null
+  }
+}
+
+async function openUsageDb() {
+  return openSqlite(join(DSH_HOME, 'bot', 'usage.sqlite'))
 }
 
 /** Token usage from DS Bot's usage ledger, grouped per Bot and over `days`. */
@@ -352,9 +368,23 @@ export function diskTargets() {
     { id: 'pnpm', label: 'pnpm store', path: pnpmStore, safe: true, hint: 'rebuilt on demand' },
     { id: 'hf', label: 'HuggingFace cache', path: join(homedir(), '.cache', 'huggingface'), safe: true, hint: 'models re-download' },
     { id: 'ollama', label: 'Ollama models', path: join(homedir(), '.ollama'), safe: false, hint: 'models must be pulled again' },
-    { id: 'claude', label: 'Claude data', path: join(APP_SUPPORT, 'Claude'), safe: false },
     { id: 'chatgpt', label: 'ChatGPT data', path: join(APP_SUPPORT, 'ChatGPT'), safe: false },
     { id: 'codex', label: 'Codex data', path: join(homedir(), '.codex'), safe: false },
+    { id: 'workbuddy', label: 'WorkBuddy', path: join(homedir(), '.workbuddy'), safe: false, hint: 'sessions, workspaces, credits db' },
+    { id: 'workbuddy-gpu', label: 'WorkBuddy GPUCache', path: join(APP_SUPPORT, 'WorkBuddy', 'GPUCache'), safe: true },
+    { id: 'workbuddy-dawn', label: 'WorkBuddy DawnGraphiteCache', path: join(APP_SUPPORT, 'WorkBuddy', 'DawnGraphiteCache'), safe: true },
+    { id: 'workbuddy-cache', label: 'WorkBuddy Cache', path: join(APP_SUPPORT, 'WorkBuddy', 'Cache'), safe: true },
+    { id: 'workbuddy-codecache', label: 'WorkBuddy Code Cache', path: join(APP_SUPPORT, 'WorkBuddy', 'Code Cache'), safe: true },
+    { id: 'zcode', label: 'ZCode', path: join(homedir(), '.zcode'), safe: false, hint: 'tasks, plan, credentials' },
+    { id: 'zcode-gpu', label: 'ZCode GPUCache', path: join(APP_SUPPORT, 'ZCode', 'GPUCache'), safe: true },
+    { id: 'zcode-cache', label: 'ZCode Cache', path: join(APP_SUPPORT, 'ZCode', 'Cache'), safe: true },
+    { id: 'claude-home', label: 'Claude home', path: join(homedir(), '.claude'), safe: false, hint: 'Claude Code skills/sessions' },
+    { id: 'claude', label: 'Claude desktop', path: join(APP_SUPPORT, 'Claude'), safe: false, hint: 'desktop data; no local token usage' },
+    { id: 'claude-gpu', label: 'Claude GPUCache', path: join(APP_SUPPORT, 'Claude', 'GPUCache'), safe: true },
+    { id: 'claude-dawn', label: 'Claude DawnGraphiteCache', path: join(APP_SUPPORT, 'Claude', 'DawnGraphiteCache'), safe: true },
+    { id: 'claude-cache', label: 'Claude Cache', path: join(APP_SUPPORT, 'Claude', 'Cache'), safe: true },
+    { id: 'trae', label: 'Trae', path: join(APP_SUPPORT, 'Trae'), safe: false, hint: 'Trae editor data' },
+    { id: 'trae-solo', label: 'Trae Solo', path: join(APP_SUPPORT, 'TRAE SOLO CN'), safe: false, hint: 'Trae Solo editor data' },
   ]
 }
 
@@ -533,6 +563,84 @@ function sendJson(res, status, body, extra = {}) {
   res.end(JSON.stringify(body))
 }
 
+
+const agentsCache = { at: 0, data: null }
+
+/** WorkBuddy credits from its local session_usage table. */
+export async function readWorkBuddy() {
+  const db = await openSqlite(WORKBUDDY_DB)
+  if (!db) return { ok: false, error: 'NO_WORKBUDDY_DB' }
+  try {
+    const rows = db.prepare('SELECT session_id, updated_at, credit_json FROM session_usage').all()
+    const now = Date.now()
+    const todayStart = startOfLocalDay(now)
+    let total = 0
+    let today = 0
+    let sevenDays = 0
+    let thirtyDays = 0
+    for (const row of rows) {
+      let credits = 0
+      try {
+        const map = JSON.parse(row.credit_json || '{}')
+        for (const value of Object.values(map)) credits += Number(value) || 0
+      } catch { /* a malformed row is skipped */ }
+      total += credits
+      const at = Number(row.updated_at) || 0
+      if (at >= todayStart) today += credits
+      if (at >= now - 7 * 86_400_000) sevenDays += credits
+      if (at >= now - 30 * 86_400_000) thirtyDays += credits
+    }
+    return { ok: true, sessions: rows.length, credits: { total, today, sevenDays, thirtyDays } }
+  } catch (error) {
+    return { ok: false, error: String(error?.message ?? error).slice(0, 140) }
+  } finally {
+    try { db.close() } catch { /* ignore */ }
+  }
+}
+
+const ZCODE_LABELS = {
+  'builtin:zai-start-plan': 'Z.ai Start',
+  'builtin:zai-coding-plan': 'Z.ai Coding',
+  'builtin:bigmodel-coding-plan': 'BigModel Coding',
+  'builtin:bigmodel-start-plan': 'BigModel Start',
+}
+
+/** ZCode only exposes plan entitlement locally, not token usage. */
+export async function readZCode() {
+  try {
+    const data = JSON.parse(await readFile(ZCODE_PLAN, 'utf8'))
+    const items = data?.entryStatus?.items ?? {}
+    const plans = Object.entries(items).map(([id, value]) => ({
+      id,
+      label: ZCODE_LABELS[id] || id,
+      status: value?.status ?? 'unknown',
+      reason: value?.reason ?? null,
+    }))
+    return { ok: true, plans, updatedAt: Number(data?.entryStatus?.updatedAt) || null }
+  } catch {
+    return { ok: false, error: 'NO_ZCODE_PLAN' }
+  }
+}
+
+/** Local AI tools beyond DSH/Cursor/Codex. Claude and Trae have no usable local usage API here. */
+export async function readAgents({ fresh = false } = {}) {
+  if (!fresh && agentsCache.data !== null && Date.now() - agentsCache.at < AGENTS_CACHE_MS) return agentsCache.data
+  const [workbuddy, zcode] = await Promise.all([readWorkBuddy(), readZCode()])
+  const data = {
+    ok: true,
+    items: [
+      { id: 'workbuddy', name: 'WorkBuddy', kind: 'credits', ...workbuddy },
+      { id: 'zcode', name: 'ZCode', kind: 'plan', ...zcode },
+      { id: 'claude', name: 'Claude', kind: 'unavailable', reason: 'NO_LOCAL_USAGE' },
+      { id: 'trae', name: 'Trae', kind: 'unavailable', reason: 'NO_LOCAL_USAGE' },
+    ],
+    updatedAt: Date.now(),
+  }
+  agentsCache.at = Date.now()
+  agentsCache.data = data
+  return data
+}
+
 export function apply(ctx, rawConfig = {}) {
   const config = normalizeConfig(rawConfig)
   const token = randomUUID()
@@ -657,6 +765,23 @@ export function apply(ctx, rawConfig = {}) {
       }
     },
   }), 'quotapot: disk clean')
+
+  ctx.effect(() => ctx.webServer.register({
+    kind: 'exact',
+    path: '/quotapot/agents',
+    handler: async (req, res) => {
+      if (req.method !== 'GET') {
+        sendJson(res, 405, { ok: false, error: 'METHOD_NOT_ALLOWED' }, { allow: 'GET' })
+        return
+      }
+      if (!tokenMatches(token, req.headers['x-quotapot-token'])) {
+        sendJson(res, 401, { ok: false, error: 'UNAUTHORIZED' })
+        return
+      }
+      const url = new URL(req.url ?? '/', 'http://127.0.0.1')
+      sendJson(res, 200, await readAgents({ fresh: url.searchParams.has('fresh') }))
+    },
+  }), 'quotapot: other agents')
 
   ctx.effect(() => ctx.webServer.register({
     kind: 'exact',

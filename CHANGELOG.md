@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.2 — 2026-10-23
+
+- Added WorkBuddy credits, ZCode plan entitlement, and an explicit "no local
+  usage" state for Claude and Trae in a new Agents tab.
+- Added WorkBuddy, ZCode, Claude and Trae data folders to Space, with safe
+  cache subfolders and user-data rows kept read-only.
+- Space now shows every scanned row; the threshold only highlights.
+- The Cursor extension 0.2.0 adds the same Other AI tools section and hides the
+  Cursor-only card when running in Trae.
+
 ## 0.3.1 — 2026-10-23
 
 - The Space tab now has an inline threshold field; it filters the list and the

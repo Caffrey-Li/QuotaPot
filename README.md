@@ -18,7 +18,8 @@ QuotaPot 是一个 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-ha
 - **每日 token 上限**：超过 `dailyTokenLimit` 时胶囊变红并显示 `超`
 - **低余额提醒**：低于阈值时胶囊变红并显示 `低`，面板给出提示
 - **更新提示**：读取 GitHub 最新 Release，发现新版本时在面板顶部提示；点击两次即可安装，重启 DSH 生效
-- **空间监控**：扫描本机 AI 工具目录，列出超过阈值（默认 3GB，可在空间页直接改）的数据和可清理缓存；只允许删除白名单缓存，勾选并二次确认
+- **空间监控**：扫描 WorkBuddy / ZCode / Cursor / Codex / Claude / Trae 等 AI 工具目录，列出超过阈值（默认 3GB，可在空间页直接改）的数据和可清理缓存；只允许删除白名单缓存，勾选并二次确认
+- **其他工具**：WorkBuddy 本地 credits、ZCode 套餐资格；Claude/Trae 没有本地用量时明确标注，不伪造数字
 - **多币种**：官方返回多个币种时全部列出，胶囊优先显示 CNY
 - **中英自动切换**：按系统语言和时区自动选中文/英文，也可强制 `zh` / `en`
 - **零依赖、无构建**：没有 React、没有打包步骤，`index.js` + `widget.js` 两个文件
@@ -34,7 +35,7 @@ QuotaPot 是一个 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-ha
 
 同一个仓库还包含两个宿主版本，共用 `agents/cursor-extension/core.cjs`：
 
-- **Cursor 扩展**：状态栏 + 可折叠侧栏（竖排卡片）+ 小鲸鱼；侧栏可拖动、调整宽度，阈值在设置里改。安装包在 `agents/cursor-extension/quotapot-0.1.0.vsix`。
+- **Cursor 扩展**：状态栏 + 可折叠侧栏（竖排卡片）+ 小鲸鱼；侧栏可拖动、调整宽度，阈值在设置里改。安装包在 `agents/cursor-extension/quotapot-0.2.0.vsix`。
 - **Codex 插件**：Codex 插件机制是 MCP server，提供 `quotapot_status` / `quotapot_balance` / `quotapot_cursor_usage` / `quotapot_codex_usage` 四个工具，没有悬浮 UI。
 
 详见 [agents/README.md](agents/README.md)。
@@ -51,7 +52,7 @@ QuotaPot 是一个 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-ha
 打开 **设置 → 插件 → 添加插件**，在“包名或地址”里填：
 
 ```text
-github:Caffrey-Li/dsh-bot-QuotaPot#v0.3.1
+github:Caffrey-Li/dsh-bot-QuotaPot#v0.3.2
 ```
 
 或者，等 npm 发布后直接填包名：
@@ -65,7 +66,7 @@ dsh-bot-quotapot
 ### 方式二：命令行（DSH Web profile）
 
 ```sh
-npx @deepseek-ai/dsh@0.2.0-rc.2 plugin --profile web add github:Caffrey-Li/dsh-bot-QuotaPot#v0.3.1
+npx @deepseek-ai/dsh@0.2.0-rc.2 plugin --profile web add github:Caffrey-Li/dsh-bot-QuotaPot#v0.3.2
 npx @deepseek-ai/dsh@0.2.0-rc.2 web
 ```
 
@@ -73,7 +74,7 @@ npx @deepseek-ai/dsh@0.2.0-rc.2 web
 
 ### 方式三：离线 `.tgz`
 
-从 [Releases](https://github.com/Caffrey-Li/dsh-bot-QuotaPot/releases) 下载 `dsh-bot-quotapot-0.3.1.tgz`，在插件页面选择本地文件安装。
+从 [Releases](https://github.com/Caffrey-Li/dsh-bot-QuotaPot/releases) 下载 `dsh-bot-quotapot-0.3.2.tgz`，在插件页面选择本地文件安装。
 
 ## 配置
 

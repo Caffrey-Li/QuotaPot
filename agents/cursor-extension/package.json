@@ -2,7 +2,7 @@
   "name": "quotapot",
   "displayName": "QuotaPot",
   "description": "DeepSeek balance, Cursor usage and Codex usage in the Cursor status bar.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "caffrey-li",
   "license": "MIT",
   "engines": {

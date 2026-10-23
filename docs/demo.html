@@ -55,6 +55,19 @@
     { id: 'npm', label: 'npm cache', path: '/Users/demo/.npm/_cacache', size: Math.round(0.26 * GB), safe: true },
   ]
   const diskData = { ok: true, items: diskItems, free: Math.round(26.2 * GB), thresholdGB: 3, scannedAt: Date.now() }
+  const agentsData = {
+    ok: true,
+    items: [
+      { id: 'workbuddy', name: 'WorkBuddy', kind: 'credits', ok: true, sessions: 521, credits: { total: 4756.59, today: 0, sevenDays: 0, thirtyDays: 71.49 } },
+      { id: 'zcode', name: 'ZCode', kind: 'plan', ok: true, plans: [
+        { id: 'builtin:zai-start-plan', label: 'Z.ai Start', status: 'available', reason: null },
+        { id: 'builtin:zai-coding-plan', label: 'Z.ai Coding', status: 'unavailable', reason: 'coding_plan_not_entitled' },
+      ], updatedAt: Date.now() },
+      { id: 'claude', name: 'Claude', kind: 'unavailable', reason: 'NO_LOCAL_USAGE' },
+      { id: 'trae', name: 'Trae', kind: 'unavailable', reason: 'NO_LOCAL_USAGE' },
+    ],
+    updatedAt: Date.now(),
+  }
   const realFetch = window.fetch.bind(window)
   window.fetch = (url, options) => {
     if (String(url).startsWith('/quotapot/update-check')) {
@@ -67,6 +80,9 @@
       const body = JSON.parse(options?.body || '{}')
       const freed = diskItems.filter(item => (body.ids || []).includes(item.id)).reduce((sum, item) => sum + item.size, 0)
       return Promise.resolve(new Response(JSON.stringify({ ok: true, freed, cleaned: body.ids, errors: [] }), { status: 200, headers: { 'content-type': 'application/json' } }))
+    }
+    if (String(url).startsWith('/quotapot/agents')) {
+      return Promise.resolve(new Response(JSON.stringify(agentsData), { status: 200, headers: { 'content-type': 'application/json' } }))
     }
     if (String(url).startsWith('/quotapot/disk')) {
       return Promise.resolve(new Response(JSON.stringify(diskData), { status: 200, headers: { 'content-type': 'application/json' } }))
@@ -96,6 +112,11 @@
   if (new URLSearchParams(location.search).get('tab') === 'space') {
     setTimeout(() => {
       document.getElementById('quotapot-host')?.shadowRoot?.querySelectorAll('.tab')[2]?.click()
+    }, 1500)
+  }
+  if (new URLSearchParams(location.search).get('tab') === 'agents') {
+    setTimeout(() => {
+      document.getElementById('quotapot-host')?.shadowRoot?.querySelectorAll('.tab')[3]?.click()
     }, 1500)
   }
 

@@ -37,7 +37,7 @@ The whale is pure SVG: a radial gradient, specular highlight, ambient shadow, ri
 Open **Settings → Plugins → Add plugin**, then enter:
 
 ```text
-github:Caffrey-Li/dsh-bot-QuotaPot#v0.3.1
+github:Caffrey-Li/dsh-bot-QuotaPot#v0.3.2
 ```
 
 After the npm release is published, you can use the package name instead:
@@ -51,7 +51,7 @@ Restart DSH completely if it says the change takes effect at the next start.
 ### 2. CLI (DSH Web profile)
 
 ```sh
-npx @deepseek-ai/dsh@0.2.0-rc.2 plugin --profile web add github:Caffrey-Li/dsh-bot-QuotaPot#v0.3.1
+npx @deepseek-ai/dsh@0.2.0-rc.2 plugin --profile web add github:Caffrey-Li/dsh-bot-QuotaPot#v0.3.2
 npx @deepseek-ai/dsh@0.2.0-rc.2 web
 ```
 
@@ -59,7 +59,7 @@ npx @deepseek-ai/dsh@0.2.0-rc.2 web
 
 ### 3. Offline `.tgz`
 
-Download `dsh-bot-quotapot-0.3.1.tgz` from [Releases](https://github.com/Caffrey-Li/dsh-bot-QuotaPot/releases) and install it from the Plugins page.
+Download `dsh-bot-quotapot-0.3.2.tgz` from [Releases](https://github.com/Caffrey-Li/dsh-bot-QuotaPot/releases) and install it from the Plugins page.
 
 ## Configuration
 

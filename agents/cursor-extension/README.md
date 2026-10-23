@@ -17,7 +17,7 @@ cd agents/cursor-extension
 npx --yes @vscode/vsce package --no-dependencies
 ```
 
-Install `quotapot-0.1.0.vsix` in Cursor: **Extensions → Install from VSIX…**.
+Install `quotapot-0.2.0.vsix` in Cursor: **Extensions → Install from VSIX…**.
 
 ## Notes
 

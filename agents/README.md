@@ -12,7 +12,7 @@ Two hosts, one shared core. The DSH web plugin in the repository root is unchang
 cd agents/cursor-extension
 npx --yes @vscode/vsce package --no-dependencies --allow-missing-repository
 /Applications/Cursor.app/Contents/Resources/app/bin/cursor \
-  --install-extension "$PWD/quotapot-0.1.0.vsix"
+  --install-extension "$PWD/quotapot-0.2.0.vsix"
 ```
 
 Reload Cursor (**Developer: Reload Window**), then:
@@ -64,8 +64,13 @@ chmod 600 ~/.quotapot/config.json
 
 The Codex plugin's `.mcp.json` uses an absolute Node path (`/Users/caffrey/.hermes/node/bin/node`) because GUI apps often miss the shell PATH. If you move this plugin to another machine, replace it with `which node`.
 
+## Trae
+
+The installed app on this machine is **TRAE SOLO CN 0.1.36**. Its CLI rejects third-party VSIX files with `ScanningExtension: Cannot read the extension`, even for a minimal empty VSIX. That is a Trae Solo limitation, not a QuotaPot packaging error. The VSIX works in Cursor; a standard Trae IDE / VS Code build that accepts VSIX should work the same way.
+
 ## Honest limits
 
 - **Cursor** has no official personal usage API. The number comes from its private dashboard endpoint and can disappear without notice.
 - **Codex** only sees sessions under `~/.codex/sessions/**/*.jsonl`. Sessions that do not record `token_count` events are ignored, so "today" can legitimately be 0 even when you used Codex.
-- **Cursor** has the animated whale in its panel. **Codex** has no UI, so no whale there; its plugin is tools only.
+- **Cursor** has the animated whale in its side bar. **Codex** has no UI, so no whale there; its plugin is tools only.
+- The same VSIX can be installed in **Trae** (VS Code fork). It detects Trae, hides the Cursor-only usage card and shows DeepSeek, Codex and the Other AI tools section (WorkBuddy credits, ZCode plan).

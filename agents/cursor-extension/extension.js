@@ -2,6 +2,7 @@
 
 const vscode = require('vscode')
 const core = require('./core.cjs')
+const HOST = /trae/i.test(vscode.env.appName || '') ? 'trae' : 'cursor'
 
 let statusItem
 let panel
@@ -59,7 +60,7 @@ function statusText(data, warnings = {}) {
       parts.push('¥—')
     }
   }
-  if (mode === 'all' || mode === 'cursor') {
+  if ((mode === 'all' || mode === 'cursor') && HOST === 'cursor') {
     const cursor = data.cursor
     if (cursor && cursor.ok) {
       parts.push(`C ${cursorPercent(cursor)}%`)
@@ -135,7 +136,9 @@ async function refresh(context, { force = false } = {}) {
       apiKey: await apiKey(context),
       baseUrl: config.deepseekBaseUrl,
       cursorBaseUrl: config.cursorBaseUrl,
+      cursorEnabled: HOST === 'cursor',
     })
+    data.host = HOST
     const cursorPct = data.cursor && data.cursor.ok ? cursorPercent(data.cursor) : 0
     const codexPct = Math.max(
       Number(data.codex && data.codex.limit && data.codex.limit.primary && data.codex.limit.primary.used_percent) || 0,
@@ -279,6 +282,16 @@ function panelHtml(sidebar = false) {
   @media (prefers-reduced-motion: reduce) {
     .pet .whale, .wave, .pet .spout { animation: none !important; }
   }
+  .other-agents { margin-top: 12px; border: 1px solid var(--vscode-panel-border); border-radius: 10px;
+    padding: 9px 12px; background: var(--vscode-sideBar-background); }
+  .other-agents summary { cursor: pointer; font-size: 12px; font-weight: 600; opacity: .8; }
+  .agent-row { padding: 7px 0; border-bottom: 1px solid var(--vscode-panel-border); font-size: 11px; }
+  .agent-row:last-child { border-bottom: 0; }
+  .agent-head { display: flex; justify-content: space-between; gap: 8px; }
+  .agent-name { font-weight: 600; }
+  .agent-value { font-variant-numeric: tabular-nums; }
+  .agent-value.muted { opacity: .6; }
+  .agent-sub { margin-top: 2px; font-size: 10px; opacity: .65; line-height: 1.45; }
   footer { margin-top: 16px; font-size: 11px; opacity: .55; line-height: 1.6; }
 </style>
 </head>
@@ -375,10 +388,14 @@ function panelHtml(sidebar = false) {
     </div>
   </section>
   <div class="grid">
-    <section class="card"><h2>DeepSeek balance</h2><div id="balance" class="big">—</div><div id="balance-meta" class="muted"></div></section>
-    <section class="card"><h2>Cursor usage</h2><div id="cursor" class="big">—</div><div id="cursor-meta" class="muted"></div></section>
-    <section class="card"><h2>Codex usage</h2><div id="codex" class="big">—</div><div id="codex-meta" class="muted"></div></section>
+    <section class="card" id="card-balance"><h2>DeepSeek balance</h2><div id="balance" class="big">—</div><div id="balance-meta" class="muted"></div></section>
+    <section class="card" id="card-cursor"><h2>Cursor usage</h2><div id="cursor" class="big">—</div><div id="cursor-meta" class="muted"></div></section>
+    <section class="card" id="card-codex"><h2>Codex usage</h2><div id="codex" class="big">—</div><div id="codex-meta" class="muted"></div></section>
   </div>
+  <details class="other-agents">
+    <summary>Other AI tools</summary>
+    <div id="agents"></div>
+  </details>
   <footer id="footer">Reading DeepSeek balance, Cursor's dashboard API and local Codex sessions.</footer>
 </div>
 <script>
@@ -387,6 +404,25 @@ function panelHtml(sidebar = false) {
   const money = (cents, currency = 'USD') => { try { return new Intl.NumberFormat(undefined, { style: 'currency', currency, maximumFractionDigits: 2 }).format((Number(cents) || 0) / 100) } catch { return '$' + ((Number(cents) || 0) / 100).toFixed(2) } }
   const tokens = value => { const n = Number(value) || 0; if (n >= 1e9) return (n / 1e9).toFixed(2) + 'B'; if (n >= 1e6) return (n / 1e6).toFixed(2) + 'M'; if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K'; return String(n) }
   const date = value => { if (!value) return '—'; const d = new Date(Number(value)); return Number.isFinite(d.getTime()) ? d.toLocaleString() : '—' }
+  function renderAgents(agents) {
+    const rows = []
+    const workbuddy = agents.workbuddy
+    if (workbuddy && workbuddy.ok) {
+      rows.push('<div class="agent-row"><div class="agent-head"><span class="agent-name">WorkBuddy</span><span class="agent-value">' + (Number(workbuddy.credits.total) || 0).toFixed(1) + ' credits</span></div><div class="agent-sub">' + workbuddy.sessions + ' sessions · today ' + (Number(workbuddy.credits.today) || 0).toFixed(2) + ' · 7d ' + (Number(workbuddy.credits.sevenDays) || 0).toFixed(2) + ' · 30d ' + (Number(workbuddy.credits.thirtyDays) || 0).toFixed(2) + '</div></div>')
+    } else {
+      rows.push('<div class="agent-row"><div class="agent-head"><span class="agent-name">WorkBuddy</span><span class="agent-value muted">unavailable</span></div></div>')
+    }
+    const zcode = agents.zcode
+    if (zcode && zcode.ok) {
+      const available = (zcode.plans || []).find(plan => plan.status === 'available')
+      rows.push('<div class="agent-row"><div class="agent-head"><span class="agent-name">ZCode</span><span class="agent-value' + (available ? '' : ' muted') + '">' + (available ? available.label : 'no plan') + '</span></div><div class="agent-sub">' + (zcode.plans || []).map(plan => plan.label + ': ' + (plan.status === 'available' ? 'available' : (plan.reason || plan.status))).join('<br>') + '</div></div>')
+    } else {
+      rows.push('<div class="agent-row"><div class="agent-head"><span class="agent-name">ZCode</span><span class="agent-value muted">no local plan</span></div></div>')
+    }
+    rows.push('<div class="agent-row"><div class="agent-head"><span class="agent-name">Claude / Trae</span><span class="agent-value muted">no local usage</span></div><div class="agent-sub">Claude desktop has no local token/quota API; Trae local usage is not exposed.</div></div>')
+    $('agents').innerHTML = rows.join('')
+  }
+
   function render(data) {
     const balance = data.balance
     if (balance && balance.ok && balance.balances.length) {
@@ -427,6 +463,10 @@ function panelHtml(sidebar = false) {
     $('balance').classList.toggle('warn', !!(data.warnings && data.warnings.balance))
     $('cursor').classList.toggle('warn', !!(data.warnings && data.warnings.cursor))
     $('codex').classList.toggle('warn', !!(data.warnings && data.warnings.codex))
+    const isTrae = data.host === 'trae'
+    $('card-cursor').hidden = isTrae
+    $('dashboard').hidden = isTrae
+    renderAgents(data.agents || {})
     $('footer').textContent = 'Updated ' + new Date(data.updatedAt || Date.now()).toLocaleTimeString() + ' · Cursor usage uses an unofficial dashboard API · Codex numbers come from local session files.'
   }
   window.addEventListener('message', event => { if (event.data && event.data.type === 'data') render(event.data.data) })
