@@ -1,7 +1,7 @@
 {
   "name": "dsh-bot-quotapot",
-  "version": "0.1.0",
-  "description": "QuotaPot: a floating DeepSeek API balance pill for DeepSeek Harness (DSH) and DS Bot, with low-balance warning and multi-currency support.",
+  "version": "0.2.0",
+  "description": "QuotaPot: a floating DeepSeek balance and token-usage pill for DeepSeek Harness (DSH) and DS Bot, with daily token limits, session spans and multi-currency support.",
   "type": "module",
   "main": "index.js",
   "license": "MIT",
@@ -34,7 +34,9 @@
     "README.md",
     "README.en.md",
     "LICENSE",
-    "docs/screenshot.png"
+    "docs/screenshot.png",
+    "docs/screenshot-usage.png",
+    "docs/pet-closeup.png"
   ],
   "peerDependencies": {
     "@deepseek-ai/cordis": ">=0.1.0-rc.5",
@@ -43,10 +45,18 @@
     "@deepseek-ai/dsh-host-webserver": ">=0.1.0-rc.5"
   },
   "peerDependenciesMeta": {
-    "@deepseek-ai/cordis": { "optional": true },
-    "@deepseek-ai/dsh": { "optional": true },
-    "@deepseek-ai/dsh-credentials": { "optional": true },
-    "@deepseek-ai/dsh-host-webserver": { "optional": true }
+    "@deepseek-ai/cordis": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-credentials": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-host-webserver": {
+      "optional": true
+    }
   },
   "dsh": {
     "bundle": {

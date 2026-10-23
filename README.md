@@ -13,11 +13,20 @@ QuotaPot 是一个 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-ha
 - **常驻显示**：余额胶囊固定在窗口角落，可拖动，位置会记住
 - **自动刷新**：默认每 30 秒拉一次余额，窗口重新获得焦点时也会刷新
 - **充值/赠金拆分**：点开胶囊看充值余额、赠金余额和更新时间
+- **小鲸鱼宠物**：浮在卡片上方的水面上；Bot 运行时从水里跃出、划弧入水，偶尔浮出喷水透气；没有冲浪板，点击一次跃一次
+- **用量标签**：今日 / 7 天 / 30 天，全部 Bot 与每个 Bot 的 token、会话跨度
+- **每日 token 上限**：超过 `dailyTokenLimit` 时胶囊变红并显示 `超`
 - **低余额提醒**：低于阈值时胶囊变红并显示 `低`，面板给出提示
 - **多币种**：官方返回多个币种时全部列出，胶囊优先显示 CNY
-- **中英双语**：跟随浏览器语言，也可强制指定
+- **中英自动切换**：按系统语言和时区自动选中文/英文，也可强制 `zh` / `en`
 - **零依赖、无构建**：没有 React、没有打包步骤，`index.js` + `widget.js` 两个文件
 - **Key 不出宿主**：API Key 只在本机 Node 进程读取，浏览器只拿到余额
+
+## 小鲸鱼
+
+![小鲸鱼细节](docs/pet-closeup.png)
+
+小鲸鱼是纯 SVG，用径向渐变、高光、环境阴影、轮廓光和接触阴影做出体积感，不依赖图片资源。Bot 运行时它从水面跃出、旋转身体、再扎回水里，入水/出水会溅起水花；浮在水面时偶尔喷水透气。波浪与卡片同宽、位于卡片顶部上方。
 
 ## 安装
 
@@ -28,7 +37,7 @@ QuotaPot 是一个 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-ha
 打开 **设置 → 插件 → 添加插件**，在“包名或地址”里填：
 
 ```text
-github:Caffrey-Li/dsh-bot-QuotaPot#v0.1.0
+github:Caffrey-Li/dsh-bot-QuotaPot#v0.2.0
 ```
 
 或者，等 npm 发布后直接填包名：
@@ -42,7 +51,7 @@ dsh-bot-quotapot
 ### 方式二：命令行（DSH Web profile）
 
 ```sh
-npx @deepseek-ai/dsh@0.2.0-rc.2 plugin --profile web add github:Caffrey-Li/dsh-bot-QuotaPot#v0.1.0
+npx @deepseek-ai/dsh@0.2.0-rc.2 plugin --profile web add github:Caffrey-Li/dsh-bot-QuotaPot#v0.2.0
 npx @deepseek-ai/dsh@0.2.0-rc.2 web
 ```
 
@@ -50,7 +59,7 @@ npx @deepseek-ai/dsh@0.2.0-rc.2 web
 
 ### 方式三：离线 `.tgz`
 
-从 [Releases](https://github.com/Caffrey-Li/dsh-bot-QuotaPot/releases) 下载 `dsh-bot-quotapot-0.1.0.tgz`，在插件页面选择本地文件安装。
+从 [Releases](https://github.com/Caffrey-Li/dsh-bot-QuotaPot/releases) 下载 `dsh-bot-quotapot-0.2.0.tgz`，在插件页面选择本地文件安装。
 
 ## 配置
 
@@ -63,6 +72,7 @@ npx @deepseek-ai/dsh@0.2.0-rc.2 web
     baseUrl: https://api.deepseek.com
     refreshSeconds: 30
     lowBalanceThreshold: 5
+    dailyTokenLimit: 2000000
     position: bottom-right
     locale: auto
 ```
@@ -73,8 +83,23 @@ npx @deepseek-ai/dsh@0.2.0-rc.2 web
 | `baseUrl` | `https://api.deepseek.com` | 自定义网关/代理地址，末尾斜杠可省略 |
 | `refreshSeconds` | `30` | 轮询间隔，限制在 10–600 秒 |
 | `lowBalanceThreshold` | `5` | 低于该金额时提醒；`0` 关闭 |
+| `dailyTokenLimit` | `0` | 每天 token 上限（含缓存），`0` 关闭；达到后胶囊变红 |
 | `position` | `bottom-right` | `bottom-right` / `bottom-left` / `top-right` / `top-left` |
-| `locale` | `auto` | `auto` 跟随 DSH 界面语言（`<html lang>`），再回退浏览器语言；或强制 `zh` / `en` |
+| `locale` | `auto` | `auto` 按系统语言/时区自动选（中国时区或中文系统 → 中文，否则英文）；或强制 `zh` / `en` |
+
+## 用量与阈值
+
+点胶囊 → **用量** 标签：
+
+- **今日 / 7 天 / 30 天** 切换
+- 全部 Bot 的 token 总量，以及每个 Bot 的 token 和**会话跨度**
+- 会话跨度 = 该 Bot 在所选范围内第一次调用到最后一次调用的时间差，**包含空闲时间**
+- `dailyTokenLimit` 按“今日”的 token 总量判断：`input + cache_read + cache_write + output`
+- 超过阈值后胶囊变红、显示 `超`，用量面板给出提示
+
+数据来自 `~/.dsh/bot/usage.sqlite`（DS Bot 自己的用量账本，**只读**）。如果 DB 不存在会显示“暂无用量数据”。注意缓存读取也计入总量，所以数字通常比“输入 + 输出”大很多。
+
+![QuotaPot 用量截图](docs/screenshot-usage.png)
 
 ## API Key 从哪里来
 
@@ -88,7 +113,7 @@ Key 需要能调用 DeepSeek 开放平台接口。如果你在 DSH 的 **设置 
 
 ## 安全
 
-- 余额路由是 `/quotapot/balance`，只接受带**进程级随机 token** 的请求；token 由页面注入，不落盘
+- 余额和用量路由（`/quotapot/balance`、`/quotapot/usage`）只接受带**进程级随机 token** 的请求；token 由页面注入，不落盘
 - 未授权请求返回 401，不返回余额
 - API Key 不会出现在页面、响应或日志里
 - 只向 `baseUrl` 的 `/user/balance` 发 GET 请求，没有遥测
@@ -102,6 +127,7 @@ Key 需要能调用 DeepSeek 开放平台接口。如果你在 DSH 的 **设置 
 | DS Bot | 0.1.x / 0.2.x（宿主插件形式） |
 | Node.js | `>=22.19.0` |
 | 平台 | macOS / Windows / Linux |
+| 用量数据 | 需要 DS Bot 0.2.x 的 `usage.sqlite`；schema 变化时可能失效 |
 
 ## 故障排查
 
@@ -122,6 +148,10 @@ Key 被拒绝。到 DeepSeek 开放平台确认 Key 和余额状态。
 **DSH 重启后显示 `请刷新页面`**
 
 进程级 token 变了，刷新页面即可。
+
+**用量标签是空的**
+
+DS Bot 还没有写入 `usage.sqlite`，或当前 Node 不支持 `node:sqlite`（需要 22.19+）。先正常聊几轮再打开；如果一直为空，检查 `~/.dsh/bot/usage.sqlite` 是否存在。
 
 **同时装了别的余额插件**
 

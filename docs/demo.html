@@ -14,22 +14,45 @@
 </style>
 </head>
 <body>
-<div class="hint">QuotaPot · DeepSeek 余额胶囊</div>
+<div class="hint">QuotaPot · DeepSeek 余额与用量</div>
 <script>
   window.__QUOTAPOT__ = {
     token: 'demo',
-    version: '0.1.0',
-    config: { refreshSeconds: 30, lowBalanceThreshold: 5, position: 'bottom-right', locale: 'zh' }
+    version: '0.2.0',
+    config: { refreshSeconds: 30, lowBalanceThreshold: 5, dailyTokenLimit: 2000000, position: 'bottom-right', locale: 'zh' }
+  }
+  const usageData = {
+    ok: true,
+    days: 1,
+    totals: {
+      tokens: 1842300, input: 240000, cacheRead: 1500000, cacheWrite: 0, output: 102300,
+      calls: 48, spanMs: 13320000, spanSumMs: 13320000
+    },
+    owners: [
+      { key: 'session-chief', name: 'Chief', kind: 'bot', tokens: 1200000, input: 160000, cacheRead: 980000, cacheWrite: 0, output: 60000, calls: 22, spanMs: 4800000 },
+      { key: 'session-writer', name: 'Writer', kind: 'bot', tokens: 400000, input: 50000, cacheRead: 320000, cacheWrite: 0, output: 30000, calls: 16, spanMs: 2700000 },
+      { key: 'session-coder', name: 'Coder', kind: 'bot', tokens: 242300, input: 30000, cacheRead: 200000, cacheWrite: 0, output: 12300, calls: 10, spanMs: 5820000 }
+    ],
+    daily: { tokens: 1842300, limit: 2000000, exceeded: false },
+    updatedAt: Date.now()
+  }
+  const balanceData = {
+    ok: true,
+    isAvailable: true,
+    balances: [{ currency: 'CNY', total: '34.21', toppedUp: '30.45', granted: '3.76' }],
+    usage: { todayTokens: 1842300, limit: 2000000, exceeded: false },
+    updatedAt: Date.now()
   }
   const realFetch = window.fetch.bind(window)
   window.fetch = (url, options) => {
     if (String(url).startsWith('/quotapot/balance')) {
-      return Promise.resolve(new Response(JSON.stringify({
-        ok: true,
-        isAvailable: true,
-        balances: [{ currency: 'CNY', total: '34.21', toppedUp: '30.45', granted: '3.76' }],
-        updatedAt: Date.now()
-      }), { status: 200, headers: { 'content-type': 'application/json' } }))
+      return Promise.resolve(new Response(JSON.stringify(balanceData), { status: 200, headers: { 'content-type': 'application/json' } }))
+    }
+    if (String(url).startsWith('/quotapot/usage')) {
+      return Promise.resolve(new Response(JSON.stringify(usageData), { status: 200, headers: { 'content-type': 'application/json' } }))
+    }
+    if (String(url).startsWith('/quotapot/activity')) {
+      return Promise.resolve(new Response(JSON.stringify({ ok: true, active: 1 }), { status: 200, headers: { 'content-type': 'application/json' } }))
     }
     return realFetch(url, options)
   }
@@ -37,9 +60,33 @@
 <script src="../widget.js"></script>
 <script>
   setTimeout(() => {
-    const host = document.getElementById('quotapot-host')
-    host?.shadowRoot?.querySelector('.pill')?.click()
+    document.getElementById('quotapot-host')?.shadowRoot?.querySelector('.pill')?.click()
   }, 900)
+  if (new URLSearchParams(location.search).get('tab') === 'usage') {
+    setTimeout(() => {
+      document.getElementById('quotapot-host')?.shadowRoot?.querySelectorAll('.tab')[1]?.click()
+    }, 1300)
+  }
+
+
+  if (new URLSearchParams(location.search).get('pose') === 'float') {
+    setTimeout(() => {
+      const pet = document.getElementById('quotapot-host')?.shadowRoot?.querySelector('.pet')
+      if (!pet) return
+      pet.getAnimations().forEach(animation => animation.cancel())
+      pet.className = 'pet floating'
+      pet.style.transform = 'translateX(117px) translateY(0px) rotate(0deg)'
+    }, 1600)
+  }
+  if (new URLSearchParams(location.search).get('pose') === 'apex') {
+    setTimeout(() => {
+      const pet = document.getElementById('quotapot-host')?.shadowRoot?.querySelector('.pet')
+      if (!pet) return
+      pet.getAnimations().forEach(animation => animation.cancel())
+      pet.className = 'pet breaching'
+      pet.style.transform = 'translateX(126.4px) translateY(-26px) rotate(0deg)'
+    }, 2000)
+  }
 </script>
 </body>
 </html>

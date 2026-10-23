@@ -1,6 +1,15 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { normalizeBalance, normalizeConfig, parseCredentialRefs, tokenMatches } from '../index.js'
+import {
+  aggregateUsage,
+  normalizeBalance,
+  normalizeConfig,
+  parseCredentialRefs,
+  startOfLocalDay,
+  sumTokens,
+  tokenMatches,
+  withDailyLimit,
+} from '../index.js'
 
 test('normalizeConfig fills safe defaults', () => {
   const config = normalizeConfig()
@@ -8,6 +17,7 @@ test('normalizeConfig fills safe defaults', () => {
   assert.equal(config.baseUrl, 'https://api.deepseek.com')
   assert.equal(config.refreshSeconds, 30)
   assert.equal(config.lowBalanceThreshold, 5)
+  assert.equal(config.dailyTokenLimit, 0)
   assert.equal(config.position, 'bottom-right')
   assert.equal(config.locale, 'auto')
 })
@@ -18,6 +28,23 @@ test('normalizeConfig clamps refresh and threshold', () => {
   assert.equal(normalizeConfig({ lowBalanceThreshold: -3 }).lowBalanceThreshold, 0)
   assert.equal(normalizeConfig({ lowBalanceThreshold: '2.5' }).lowBalanceThreshold, 2.5)
   assert.equal(normalizeConfig({ lowBalanceThreshold: 'nope' }).lowBalanceThreshold, 5)
+  assert.equal(normalizeConfig({ dailyTokenLimit: '1000' }).dailyTokenLimit, 1000)
+  assert.equal(normalizeConfig({ dailyTokenLimit: -5 }).dailyTokenLimit, 0)
+  assert.equal(normalizeConfig({ dailyTokenLimit: 'nope' }).dailyTokenLimit, 0)
+})
+
+test('sumTokens counts input, cache and output', () => {
+  assert.equal(sumTokens({ input: 10, cacheRead: 20, cacheWrite: 3, output: 5 }), 38)
+  assert.equal(sumTokens({}), 0)
+  assert.equal(sumTokens(null), 0)
+})
+
+test('startOfLocalDay returns local midnight', () => {
+  const now = new Date(2026, 9, 23, 15, 42, 7).getTime()
+  const start = new Date(startOfLocalDay(now))
+  assert.equal(start.getHours(), 0)
+  assert.equal(start.getMinutes(), 0)
+  assert.equal(start.getDate(), 23)
 })
 
 test('normalizeConfig normalizes baseUrl and enums', () => {
@@ -98,4 +125,44 @@ test('tokenMatches is constant-time and length-safe', () => {
   assert.equal(tokenMatches('abc', 'ab'), false)
   assert.equal(tokenMatches('', ''), false)
   assert.equal(tokenMatches('abc', undefined), false)
+})
+
+
+test('aggregateUsage groups owners and computes session spans', () => {
+  const rows = [
+    { time: 1000, owner: 'bot:a', name: 'Alpha', input: 10, cacheRead: 0, cacheWrite: 0, output: 5 },
+    { time: 2000, owner: 'bot:a', name: 'Alpha', input: 0, cacheRead: 20, cacheWrite: 0, output: 1 },
+    { time: 3000, owner: 'room:r', name: 'Group', input: 7, cacheRead: 0, cacheWrite: 0, output: 2 },
+  ]
+  const usage = aggregateUsage(rows)
+  assert.equal(usage.owners.length, 2)
+  assert.equal(usage.owners[0].name, 'Alpha')
+  assert.equal(usage.owners[0].tokens, 36)
+  assert.equal(usage.owners[0].spanMs, 1000)
+  assert.equal(usage.owners[1].kind, 'group')
+  assert.equal(usage.totals.tokens, 45)
+  assert.equal(usage.totals.calls, 3)
+  assert.equal(usage.totals.spanMs, 2000)
+  assert.equal(usage.totals.spanSumMs, 1000)
+})
+
+test('aggregateUsage filters by since and falls back to the owner key', () => {
+  const rows = [
+    { time: 1000, owner: 'bot:a', name: 'Alpha', input: 10, output: 0 },
+    { time: 3000, owner: 'other', name: '', input: 4, output: 1 },
+  ]
+  const usage = aggregateUsage(rows, { since: 2000 })
+  assert.equal(usage.owners.length, 1)
+  assert.equal(usage.owners[0].key, 'other')
+  assert.equal(usage.owners[0].name, 'other')
+  assert.equal(usage.owners[0].kind, 'other')
+  assert.equal(usage.totals.tokens, 5)
+})
+
+test('withDailyLimit marks the configured threshold', () => {
+  const usage = { ok: true, today: { tokens: 120 } }
+  assert.equal(withDailyLimit(usage, 100).daily.exceeded, true)
+  assert.equal(withDailyLimit(usage, 200).daily.exceeded, false)
+  assert.equal(withDailyLimit(usage, 0).daily.exceeded, false)
+  assert.equal(withDailyLimit({ ok: false }, 100).ok, false)
 })
