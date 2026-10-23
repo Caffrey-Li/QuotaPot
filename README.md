@@ -1,210 +1,82 @@
 # QuotaPot
 
-> DeepSeek 余额胶囊 + 小鲸鱼，同时提供 Cursor/VS Code 扩展和 WorkBuddy/Claude/ZCode/Codex 的 MCP 插件。
+> DeepSeek 余额、Cursor / Codex / WorkBuddy / ZCode 用量，加上一只小鲸鱼。  
+> 一个仓库，三种安装形态：DSH 插件、Cursor/VS Code 扩展、MCP 插件。
 
-QuotaPot 是一个多宿主插件：DSH 里是余额胶囊，Cursor/VS Code/Trae 里是扩展，WorkBuddy/Claude/ZCode/Codex 里是 MCP 工具。它在界面角落显示一个可拖动的余额胶囊，数据来自 DeepSeek 官方 `GET /user/balance` 接口。
-
-![QuotaPot 截图](docs/screenshot.png)
-
-*界面示意，余额为示例数据。*
+![QuotaPot](docs/screenshot.png)
 
 ## 功能
 
-- **常驻显示**：余额胶囊固定在窗口角落，可拖动，位置会记住
-- **自动刷新**：默认每 30 秒拉一次余额，窗口重新获得焦点时也会刷新
-- **充值/赠金拆分**：点开胶囊看充值余额、赠金余额和更新时间
-- **小鲸鱼宠物**：浮在卡片上方的水面上；Bot 运行时从水里跃出、划弧入水，偶尔浮出喷水透气；没有冲浪板，点击一次跃一次
-- **用量标签**：今日 / 7 天 / 30 天，全部 Bot 与每个 Bot 的 token、会话跨度
-- **每日 token 上限**：超过 `dailyTokenLimit` 时胶囊变红并显示 `超`
-- **低余额提醒**：低于阈值时胶囊变红并显示 `低`，面板给出提示
-- **更新提示**：读取 GitHub 最新 Release，发现新版本时在面板顶部提示；点击两次即可安装，重启 DSH 生效
-- **空间监控**：扫描 WorkBuddy / ZCode / Cursor / Codex / Claude / Trae 等 AI 工具目录，列出超过阈值（默认 3GB，可在空间页直接改）的数据和可清理缓存；只允许删除白名单缓存，勾选并二次确认
-- **其他工具**：WorkBuddy 本地 credits、ZCode 套餐资格；Claude/Trae 没有本地用量时明确标注，不伪造数字
-- **多币种**：官方返回多个币种时全部列出，胶囊优先显示 CNY
-- **中英自动切换**：按系统语言和时区自动选中文/英文，也可强制 `zh` / `en`
-- **零依赖、无构建**：没有 React、没有打包步骤，`index.js` + `widget.js` 两个文件
-- **Key 不出宿主**：API Key 只在本机 Node 进程读取，浏览器只拿到余额
-
-## 小鲸鱼
-
-![小鲸鱼细节](docs/pet-closeup.png)
-
-小鲸鱼是纯 SVG，用径向渐变、高光、环境阴影、轮廓光和接触阴影做出体积感，不依赖图片资源。Bot 运行时它从水面跃出、旋转身体、再扎回水里，入水/出水会溅起水花；浮在水面时偶尔喷水透气。波浪与卡片同宽、位于卡片顶部上方。
-
-## 多宿主插件
-
-同一个仓库提供三种安装形态，共用 `agents/` 下的 core：
-
-| 宿主 | 形态 | 入口 |
-|---|---|---|
-| **DeepSeek Harness / DS Bot** | 网页余额胶囊 + 小鲸鱼 | 本仓库根包 |
-| **Cursor / VS Code / 标准 Trae** | VS Code 扩展（侧栏 + 状态栏 + 鲸鱼） | Release 里的 `quotapot-0.2.0.vsix` |
-| **WorkBuddy / Claude Desktop / ZCode / Codex** | MCP server，无独立 UI | `agents/mcp` / Release 里的 MCP 包 |
-
-MCP 工具：
-
-- `quotapot_status`
-- `quotapot_balance`
-- `quotapot_cursor_usage`
-- `quotapot_codex_usage`
-- `quotapot_usage_models`（按模型统计 today / 7d / 30d）
-
-MCP 宿主直接安装（使用 Release 资产，不依赖 GitHub git 通道）：
-
-```sh
-npx -y --package https://github.com/Caffrey-Li/dsh-bot-QuotaPot/releases/download/v0.4.1/dsh-bot-quotapot-mcp-0.4.1.tgz quotapot-mcp
-```
-
-配置模板在 [agents/templates](agents/templates)，完整说明在 [agents/README.md](agents/README.md)。
-
-> Cursor 用量来自未公开的 `api2.cursor.sh`；Codex 只统计本地 `token_count`；WorkBuddy 是 credits 不是 token；ZCode 只有套餐资格；Claude/Trae 桌面版没有本地用量。Trae 需要标准 Trae IDE，TRAE SOLO CN 不支持第三方插件。
-
+- **DSH / DS Bot**：余额胶囊、今日/7天/30天用量、会话跨度、每日 token 阈值、低余额提醒、更新提示、磁盘空间监控、小鲸鱼。
+- **Cursor / VS Code / 标准 Trae**：可折叠侧栏、状态栏、Cursor 用量、Codex 用量、其他 AI 工具、阈值设置、小鲸鱼。
+- **WorkBuddy / Claude Desktop / ZCode / Codex**：MCP 插件，无独立 UI，五个工具。
+- **按模型统计**：DSH、Codex、WorkBuddy 的模型级 token / credits。
 
 ## 安装
 
-> 需要 DSH `0.2.0-rc.2` 或更新版本，Node `22.19+`。
+### DeepSeek Harness / DS Bot
 
-### 方式一：DSH 插件页面（推荐）
-
-打开 **设置 → 插件 → 添加插件**，在“包名或地址”里填：
+设置 → 插件 → 添加插件，填：
 
 ```text
 github:Caffrey-Li/dsh-bot-QuotaPot#v0.4.1
 ```
 
-或者，等 npm 发布后直接填包名：
+CLI、离线 `.tgz`、桌面端说明见 [配置文档](docs/CONFIG.md#安装补充)。
 
-```text
-dsh-bot-quotapot
-```
+### Cursor / VS Code / 标准 Trae
 
-安装后如果 DSH 提示需要重启，完全退出再打开。
+下载并安装：
 
-### 方式二：命令行（DSH Web profile）
+[quotapot-0.2.0.vsix](https://github.com/Caffrey-Li/dsh-bot-QuotaPot/releases/download/v0.4.1/quotapot-0.2.0.vsix)
+
+安装后执行 `Developer: Reload Window`。TRAE SOLO CN 不支持第三方 VSIX，需要标准 Trae IDE。
+
+### WorkBuddy / Claude Desktop / ZCode / Codex
+
+MCP server 直接跑，不需要 npm 发布：
 
 ```sh
-npx @deepseek-ai/dsh@0.2.0-rc.2 plugin --profile web add github:Caffrey-Li/dsh-bot-QuotaPot#v0.4.1
-npx @deepseek-ai/dsh@0.2.0-rc.2 web
+npx -y --package https://github.com/Caffrey-Li/dsh-bot-QuotaPot/releases/download/v0.4.1/dsh-bot-quotapot-mcp-0.4.1.tgz quotapot-mcp
 ```
 
-> Desktop profile 由桌面 App 独占管理，命令行会拒绝；请用方式一。
+各宿主配置模板在 [agents/templates](agents/templates)，完整说明在 [agents/README.md](agents/README.md)。
 
-### 方式三：离线 `.tgz`
+## MCP 工具
 
-从 [Releases](https://github.com/Caffrey-Li/dsh-bot-QuotaPot/releases) 下载 `dsh-bot-quotapot-0.4.1.tgz`，在插件页面选择本地文件安装。
+- `quotapot_status` — 余额 + 各宿主用量
+- `quotapot_balance`
+- `quotapot_cursor_usage`
+- `quotapot_codex_usage`
+- `quotapot_usage_models` — 按模型统计 today / 7d / 30d
 
 ## 配置
 
-所有配置都可选。写进 profile 的 `cordis.patch.yml`：
+所有字段可选。常用：`lowBalanceThreshold`、`dailyTokenLimit`、`diskThresholdGB`（也能在空间页直接改）。
 
-```yaml
-- id: quotapot
-  config:
-    apiKeyEnv: DEEPSEEK_API_KEY
-    baseUrl: https://api.deepseek.com
-    refreshSeconds: 30
-    lowBalanceThreshold: 5
-    dailyTokenLimit: 2000000
-    diskThresholdGB: 3
-    position: bottom-right
-    locale: auto
-```
+完整字段、API Key 来源、安全边界、兼容性和卸载方式见 **[docs/CONFIG.md](docs/CONFIG.md)**。
 
-| 字段 | 默认 | 说明 |
-|---|---|---|
-| `apiKeyEnv` | `DEEPSEEK_API_KEY` | 读取 Key 的环境变量名 |
-| `baseUrl` | `https://api.deepseek.com` | 自定义网关/代理地址，末尾斜杠可省略 |
-| `refreshSeconds` | `30` | 轮询间隔，限制在 10–600 秒 |
-| `lowBalanceThreshold` | `5` | 低于该金额时提醒；`0` 关闭 |
-| `dailyTokenLimit` | `0` | 每天 token 上限（含缓存），`0` 关闭；达到后胶囊变红 |
-| `diskThresholdGB` | `3` | 空间标签页中标记“超过”的阈值（GB） |
-| `position` | `bottom-right` | `bottom-right` / `bottom-left` / `top-right` / `top-left` |
-| `locale` | `auto` | `auto` 按系统语言/时区自动选（中国时区或中文系统 → 中文，否则英文）；或强制 `zh` / `en` |
-
-## 用量与阈值
-
-点胶囊 → **用量** 标签：
-
-- **今日 / 7 天 / 30 天** 切换
-- 全部 Bot 的 token 总量，以及每个 Bot 的 token 和**会话跨度**
-- 会话跨度 = 该 Bot 在所选范围内第一次调用到最后一次调用的时间差，**包含空闲时间**
-- `dailyTokenLimit` 按“今日”的 token 总量判断：`input + cache_read + cache_write + output`
-- 超过阈值后胶囊变红、显示 `超`，用量面板给出提示
-
-数据来自 `~/.dsh/bot/usage.sqlite`（DS Bot 自己的用量账本，**只读**）。如果 DB 不存在会显示“暂无用量数据”。注意缓存读取也计入总量，所以数字通常比“输入 + 输出”大很多。
-
-![QuotaPot 用量截图](docs/screenshot-usage.png)
-
-## API Key 从哪里来
-
-按顺序尝试：
-
-1. 环境变量 `apiKeyEnv`（默认 `DEEPSEEK_API_KEY`）
-2. DSH 凭据存储（`ctx.credentials`，支持轮换和 keychain）
-3. `~/.dsh/.credentials.yaml` 里 `refs.DEEPSEEK_API_KEY`
-
-Key 需要能调用 DeepSeek 开放平台接口。如果你在 DSH 的 **设置 → 模型** 里已经配置了 DeepSeek，通常不需要再填。
-
-## 安全
-
-- 余额和用量路由（`/quotapot/balance`、`/quotapot/usage`）只接受带**进程级随机 token** 的请求；token 由页面注入，不落盘
-- 未授权请求返回 401，不返回余额
-- API Key 不会出现在页面、响应或日志里
-- 只向 `baseUrl` 的 `/user/balance` 发 GET 请求，没有遥测
-- 和 DSH 一样只监听 `127.0.0.1`；如果你用手机前门把 DSH 暴露到局域网，余额也会随 UI 一起可见
-
-## 兼容性
-
-| 项目 | 版本 |
-|---|---|
-| DSH Web / Desktop | `0.2.0-rc.2`、`0.2.1-rc.2` 实测 |
-| DS Bot | 0.1.x / 0.2.x（宿主插件形式） |
-| Node.js | `>=22.19.0` |
-| 平台 | macOS / Windows / Linux |
-| 用量数据 | 需要 DS Bot 0.2.x 的 `usage.sqlite`；schema 变化时可能失效 |
-
-## 故障排查
-
-**胶囊没出现**
-
-1. 强制刷新页面（`Cmd/Ctrl + Shift + R`）
-2. 确认插件已启用：设置 → 插件
-3. 访问 `http://127.0.0.1:<port>/quotapot/widget.js`，应返回 JS；404 说明宿主插件没加载，重启 DSH
-
-**显示 `余额 --` / `NO_KEY`**
-
-没有找到 Key。检查 `DEEPSEEK_API_KEY`，或在 设置 → 模型 里配置 DeepSeek。
-
-**显示 `API Key 无效或已过期`**
-
-Key 被拒绝。到 DeepSeek 开放平台确认 Key 和余额状态。
-
-**DSH 重启后显示 `请刷新页面`**
-
-进程级 token 变了，刷新页面即可。
-
-**用量标签是空的**
-
-DS Bot 还没有写入 `usage.sqlite`，或当前 Node 不支持 `node:sqlite`（需要 22.19+）。先正常聊几轮再打开；如果一直为空，检查 `~/.dsh/bot/usage.sqlite` 是否存在。
-
-**同时装了别的余额插件**
-
-路由和全局变量都带 `quotapot` 前缀，不会冲突；如果两个胶囊都显示，卸载其中一个即可。
-
-## 开发
+MCP 宿主的 DeepSeek Key：
 
 ```sh
-node --check index.js
-node --check widget.js
-npm test
+mkdir -p ~/.quotapot
+printf '{"deepseekApiKey":"sk-..."}\n' > ~/.quotapot/config.json
+chmod 600 ~/.quotapot/config.json
 ```
 
-本仓库没有运行时依赖，测试使用 Node 自带 `node:test`。
+## 限制
 
-## 卸载
+- Cursor 用量来自未公开的 `api2.cursor.sh`，可能失效。
+- Codex 只统计本地写入 `token_count` 的会话。
+- WorkBuddy 是 credits；ZCode 只有套餐资格；Claude/Trae 桌面版没有本地用量。
 
-设置 → 插件 → 停用/移除 QuotaPot。插件不写业务数据，卸载后不会留下余额或 Key。
+## 文档
+
+- [配置、安全、兼容、开发、卸载](docs/CONFIG.md)
+- [故障排查](docs/TROUBLESHOOTING.md)
+- [多宿主插件说明](agents/README.md)
+- [更新日志](CHANGELOG.md)
 
 ## License
 
-MIT。QuotaPot 是独立社区项目，不是 DeepSeek 官方产品；DeepSeek 是其权利人的商标。
+MIT。QuotaPot 是独立社区项目，不是 DeepSeek 官方产品。
