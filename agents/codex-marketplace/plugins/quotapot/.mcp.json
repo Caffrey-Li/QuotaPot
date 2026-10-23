@@ -1,0 +1,21 @@
+{
+  "mcpServers": {
+    "quotapot": {
+      "command": "/Users/caffrey/.hermes/node/bin/node",
+      "args": [
+        "./server.cjs"
+      ],
+      "cwd": ".",
+      "enabled": true,
+      "env_vars": [
+        "DEEPSEEK_API_KEY",
+        "DEEPSEEK_BASE_URL",
+        "CURSOR_API_BASE_URL",
+        "HOME",
+        "PATH"
+      ],
+      "startup_timeout_sec": 10,
+      "tool_timeout_sec": 60
+    }
+  }
+}

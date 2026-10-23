@@ -1,0 +1,20 @@
+{
+  "name": "quotapot-local",
+  "interface": {
+    "displayName": "QuotaPot Local"
+  },
+  "plugins": [
+    {
+      "name": "quotapot",
+      "source": {
+        "source": "local",
+        "path": "./plugins/quotapot"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}

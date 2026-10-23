@@ -30,6 +30,18 @@ QuotaPot 是一个 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-ha
 
 小鲸鱼是纯 SVG，用径向渐变、高光、环境阴影、轮廓光和接触阴影做出体积感，不依赖图片资源。Bot 运行时它从水面跃出、旋转身体、再扎回水里，入水/出水会溅起水花；浮在水面时偶尔喷水透气。波浪与卡片同宽、位于卡片顶部上方。
 
+## Cursor / Codex 插件
+
+同一个仓库还包含两个宿主版本，共用 `agents/cursor-extension/core.cjs`：
+
+- **Cursor 扩展**：状态栏 + 面板 + 小鲸鱼，显示 DeepSeek 余额、Cursor 用量、Codex 本地 token 与额度。安装包在 `agents/cursor-extension/quotapot-0.1.0.vsix`。
+- **Codex 插件**：Codex 插件机制是 MCP server，提供 `quotapot_status` / `quotapot_balance` / `quotapot_cursor_usage` / `quotapot_codex_usage` 四个工具，没有悬浮 UI。
+
+详见 [agents/README.md](agents/README.md)。
+
+> Cursor 用量来自未公开的 `api2.cursor.sh` 接口；Codex 用量只统计本地 `~/.codex/sessions` 中记录了 `token_count` 的会话。
+
+
 ## 安装
 
 > 需要 DSH `0.2.0-rc.2` 或更新版本，Node `22.19+`。

@@ -1,0 +1,47 @@
+{
+  "name": "quotapot",
+  "displayName": "QuotaPot",
+  "description": "DeepSeek balance, Cursor usage and Codex usage in the Cursor status bar.",
+  "version": "0.1.0",
+  "publisher": "caffrey-li",
+  "license": "MIT",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Other"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./extension.js",
+  "contributes": {
+    "commands": [
+      { "command": "quotapot.open", "title": "QuotaPot: Open Panel" },
+      { "command": "quotapot.refresh", "title": "QuotaPot: Refresh" },
+      { "command": "quotapot.setApiKey", "title": "QuotaPot: Set DeepSeek API Key" },
+      { "command": "quotapot.openCursorDashboard", "title": "QuotaPot: Open Cursor Usage Dashboard" }
+    ],
+    "configuration": {
+      "title": "QuotaPot",
+      "properties": {
+        "quotapot.deepseekBaseUrl": {
+          "type": "string",
+          "default": "https://api.deepseek.com",
+          "description": "DeepSeek API base URL."
+        },
+        "quotapot.cursorBaseUrl": {
+          "type": "string",
+          "default": "https://api2.cursor.sh",
+          "description": "Cursor dashboard API base URL (unofficial)."
+        },
+        "quotapot.refreshSeconds": {
+          "type": "number",
+          "default": 120,
+          "minimum": 30,
+          "description": "Auto refresh interval in seconds."
+        },
+        "quotapot.statusBar": {
+          "type": "string",
+          "enum": ["all", "balance", "cursor", "codex"],
+          "default": "all",
+          "description": "What to show in the status bar."
+        }
+      }
+    }
+  }
+}
