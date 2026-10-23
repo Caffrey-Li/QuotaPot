@@ -26,6 +26,15 @@ const TOOLS = [
     description: 'Codex token totals and rate limits parsed from ~/.codex/sessions.',
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
   },
+  {
+    name: 'quotapot_usage_models',
+    description: 'Per-model usage across DSH, Codex and WorkBuddy for today, 7 days or 30 days.',
+    inputSchema: {
+      type: 'object',
+      properties: { days: { type: 'integer', enum: [1, 7, 30], description: '1 (today), 7 or 30 days.' } },
+      additionalProperties: false,
+    },
+  },
 ]
 
 function send(message) {
@@ -48,7 +57,8 @@ function deepseekOptions() {
   }
 }
 
-async function callTool(name) {
+async function callTool(name, args = {}) {
+  if (name === 'quotapot_usage_models') return core.usageModels(args.days || 1)
   if (name === 'quotapot_status') {
     return core.status({
       ...deepseekOptions(),
@@ -88,7 +98,7 @@ rl.on('line', async line => {
   if (method === 'tools/call') {
     const name = params?.name
     try {
-      const data = await callTool(name)
+      const data = await callTool(name, params?.arguments || {})
       result(id, { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] })
     } catch (error) {
       result(id, { content: [{ type: 'text', text: `QuotaPot error: ${error && error.message ? error.message : error}` }], isError: true })

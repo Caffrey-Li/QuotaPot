@@ -1,12 +1,93 @@
-# QuotaPot for Cursor and Codex
+# QuotaPot inside AI agents
+
+QuotaPot is not a separate monitoring app. The integration is a shared **MCP server** that each agent can call as a plugin/tool. The Cursor extension and the DSH web pill are additional front ends.
 
 ![QuotaPot whale in Cursor](cursor-preview.png)
 
-Two hosts, one shared core. The DSH web plugin in the repository root is unchanged.
+## One MCP server, four hosts
 
-## Cursor
+Server: `agents/codex-marketplace/plugins/quotapot/server.cjs`
 
-**Installed locally already** as `caffrey-li.quotapot`. Build/install again with:
+Tools:
+
+- `quotapot_status` — DeepSeek, Cursor, Codex, WorkBuddy, ZCode
+- `quotapot_balance` — DeepSeek balance
+- `quotapot_cursor_usage` — Cursor billing period
+- `quotapot_codex_usage` — Codex token totals and rate limits
+- `quotapot_usage_models` — per-model tokens/credits for today / 7d / 30d
+
+`quotapot_usage_models` aggregates DSH calls by provider/model, Codex sessions by `turn_context.model`, and WorkBuddy credits by session model. Cursor has no model-level data.
+
+### WorkBuddy
+
+Already merged into `~/.workbuddy/mcp.json` (backup next to it):
+
+```json
+"quotapot": {
+  "command": "/Users/caffrey/.hermes/node/bin/node",
+  "args": ["/Users/caffrey/.dsh/bot/workspace/dsh-bot-QuotaPot/agents/codex-marketplace/plugins/quotapot/server.cjs"],
+  "env": {}
+}
+```
+
+Restart WorkBuddy. In the connector management page, find the new `quotapot` server and click **Trust**. Then ask:
+
+> 用 QuotaPot 查一下余额、用量，并按模型统计 30 天用量。
+
+### Claude Desktop
+
+Already merged into `~/Library/Application Support/Claude/claude_desktop_config.json` (backup next to it):
+
+```json
+"mcpServers": {
+  "quotapot": {
+    "command": "/Users/caffrey/.hermes/node/bin/node",
+    "args": ["/Users/caffrey/.dsh/bot/workspace/dsh-bot-QuotaPot/agents/codex-marketplace/plugins/quotapot/server.cjs"],
+    "env": {}
+  }
+}
+```
+
+Quit and reopen Claude. Then ask the same question in a chat.
+
+> Claude Code CLI is not installed on this machine. If you install it, the same server can be added to its `.mcp.json`.
+
+### ZCode
+
+ZCode uses a plugin marketplace with `.zcode-plugin/plugin.json` + `.mcp.json`. A local plugin has been written to:
+
+```text
+~/.zcode/cli/plugins/cache/quotapot-local/quotapot/0.1.0/
+~/.zcode/cli/plugins/marketplaces/quotapot-local/marketplace.json
+```
+
+It is also listed in the official marketplace file (backup next to it) so it can be enabled from the plugin page. Restart ZCode, open Plugins, enable **QuotaPot**.
+
+### Codex
+
+Already configured in `~/.codex/config.toml` with the local marketplace under `agents/codex-marketplace`. Restart ChatGPT/Codex.
+
+### Trae
+
+The installed app is **TRAE SOLO CN 0.1.36**. Its CLI rejects third-party VSIX files with `ScanningExtension: Cannot read the extension` — a minimal empty VSIX fails too. I also found no MCP configuration surface in this build. QuotaPot cannot be installed into Trae Solo as a plugin. The same MCP server/VSIX should be tested on a standard Trae IDE or VS Code; this machine only has the Solo build.
+
+## DeepSeek key for MCP hosts
+
+GUI agents often do not inherit `DEEPSEEK_API_KEY`. Put it in a private file instead:
+
+```sh
+mkdir -p ~/.quotapot
+printf '{"deepseekApiKey":"sk-..."}\n' > ~/.quotapot/config.json
+chmod 600 ~/.quotapot/config.json
+```
+
+The skeleton file already exists with `{}`. The file is read by the MCP server; the Cursor extension uses SecretStorage first and falls back to it.
+
+## Cursor extension
+
+Installed as `caffrey-li.quotapot` 0.2.0. Reload Cursor, then use the QuotaPot side bar / status bar. It adds WorkBuddy credits and ZCode plan under **Other AI tools**, and hides the Cursor-only card when the host is Trae (if a compatible Trae build ever loads it).
+
+Build/install:
 
 ```sh
 cd agents/cursor-extension
@@ -15,62 +96,10 @@ npx --yes @vscode/vsce package --no-dependencies --allow-missing-repository
   --install-extension "$PWD/quotapot-0.2.0.vsix"
 ```
 
-Reload Cursor (**Developer: Reload Window**), then:
+## Limits
 
-- A compact **QuotaPot side bar view** in the activity bar. Drag its icon to the secondary side bar or panel, resize it, or collapse it. The status bar click focuses the view instead of opening an editor tab.
-- Status bar: `QuotaPot ¥34.21 · C 78% · X 60%`
-- The side bar has the QuotaPot whale (floats, breaches, splashes, spouts, click to breach) and vertical cards for DeepSeek balance, Cursor usage and Codex usage.
-- **QuotaPot: Open in Editor** opens the wide three-column view if you want it; the default is the side bar.
-- Thresholds: click the gear in the side bar header, or run **QuotaPot: Open Settings**. Settings include `deepseekLowBalance`, `cursorWarningPercent`, `codexWarningPercent` and `dailyTokenLimit`. Reaching one turns the status bar/card warning color.
-- The disk threshold is in DSH QuotaPot's **Space** tab (inline GB field, default 3); the Cursor side bar deliberately does not include a disk scanner.
-- Run **QuotaPot: Set DeepSeek API Key** to store the key in Cursor SecretStorage.
-- `QuotaPot: Open Cursor Usage Dashboard` opens the official page.
-
-Cursor usage uses the same **undocumented** `api2.cursor.sh` dashboard API as the existing Cursor Usage extension. It reads `cursorAuth/accessToken` from `state.vscdb` with the system `sqlite3` command. It can break when Cursor changes the API.
-
-## Codex
-
-Codex plugins are MCP servers, not UI extensions. This one exposes tools:
-
-- `quotapot_status` — DeepSeek + Cursor + Codex
-- `quotapot_balance` — DeepSeek
-- `quotapot_cursor_usage` — Cursor
-- `quotapot_codex_usage` — local Codex sessions
-
-Already appended to `~/.codex/config.toml` (a backup is next to it):
-
-```toml
-[marketplaces.quotapot-local]
-source_type = "local"
-source = "/Users/caffrey/.dsh/bot/workspace/dsh-bot-QuotaPot/agents/codex-marketplace"
-
-[plugins."quotapot@quotapot-local"]
-enabled = true
-```
-
-Restart ChatGPT/Codex to load it. Then ask Codex:
-
-> 用 QuotaPot 查一下 DeepSeek 余额、Cursor 用量和 Codex 用量。
-
-### DeepSeek key for Codex
-
-The GUI app does not inherit shell environment variables reliably. Either export `DEEPSEEK_API_KEY` where Codex starts, or create a private file:
-
-```sh
-mkdir -p ~/.quotapot
-printf '{"deepseekApiKey":"sk-..."}\n' > ~/.quotapot/config.json
-chmod 600 ~/.quotapot/config.json
-```
-
-The Codex plugin's `.mcp.json` uses an absolute Node path (`/Users/caffrey/.hermes/node/bin/node`) because GUI apps often miss the shell PATH. If you move this plugin to another machine, replace it with `which node`.
-
-## Trae
-
-The installed app on this machine is **TRAE SOLO CN 0.1.36**. Its CLI rejects third-party VSIX files with `ScanningExtension: Cannot read the extension`, even for a minimal empty VSIX. That is a Trae Solo limitation, not a QuotaPot packaging error. The VSIX works in Cursor; a standard Trae IDE / VS Code build that accepts VSIX should work the same way.
-
-## Honest limits
-
-- **Cursor** has no official personal usage API. The number comes from its private dashboard endpoint and can disappear without notice.
-- **Codex** only sees sessions under `~/.codex/sessions/**/*.jsonl`. Sessions that do not record `token_count` events are ignored, so "today" can legitimately be 0 even when you used Codex.
-- **Cursor** has the animated whale in its side bar. **Codex** has no UI, so no whale there; its plugin is tools only.
-- The same VSIX can be installed in **Trae** (VS Code fork). It detects Trae, hides the Cursor-only usage card and shows DeepSeek, Codex and the Other AI tools section (WorkBuddy credits, ZCode plan).
+- **Cursor** usage is its private `api2.cursor.sh` dashboard API; it can break.
+- **Codex** only sees local sessions that record `token_count`; "today" can be 0.
+- **WorkBuddy** exposes credits, not token counts; per-model breakdown uses `sessions.model`.
+- **ZCode** exposes plan entitlement, not usage; disk only.
+- **Claude Desktop** and **Trae** have no local token/quota API; only explicit "no local usage" plus disk.

@@ -12,6 +12,7 @@ const path = require('node:path')
 const execFileAsync = promisify(execFile)
 
 const TIMEOUT_MS = 15_000
+const SQLITE3 = process.platform === 'darwin' ? '/usr/bin/sqlite3' : 'sqlite3'
 const GB = 1024 ** 3
 
 function withTimeout() {
@@ -63,7 +64,7 @@ async function cursorToken() {
   const db = cursorDbPath()
   if (!fs.existsSync(db)) throw new Error('CURSOR_DB_NOT_FOUND')
   try {
-    const { stdout } = await execFileAsync('sqlite3', [
+    const { stdout } = await execFileAsync(SQLITE3, [
       db,
       "SELECT value FROM ItemTable WHERE key = 'cursorAuth/accessToken';",
     ], { timeout: 10_000, maxBuffer: 1024 * 1024 })
@@ -232,7 +233,7 @@ async function codexUsage() {
 async function workbuddyUsage() {
   const db = path.join(os.homedir(), '.workbuddy', 'workbuddy.db')
   if (!fs.existsSync(db)) throw new Error('NO_WORKBUDDY_DB')
-  const { stdout } = await execFileAsync('sqlite3', [
+  const { stdout } = await execFileAsync(SQLITE3, [
     '-json', db,
     'SELECT session_id, updated_at, credit_json FROM session_usage;',
   ], { timeout: 15_000, maxBuffer: 8 * 1024 * 1024 })
@@ -280,6 +281,89 @@ async function zcodeStatus() {
   } catch {
     return { ok: false, error: 'NO_ZCODE_PLAN' }
   }
+}
+
+async function sqliteJson(db, sql) {
+  const { stdout } = await execFileAsync(SQLITE3, ['-json', db, sql], { timeout: 15_000, maxBuffer: 16 * 1024 * 1024 })
+  const text = String(stdout).trim()
+  return text === '' ? [] : JSON.parse(text)
+}
+
+function localDayStart(now = Date.now()) {
+  const date = new Date(now)
+  date.setHours(0, 0, 0, 0)
+  return date.getTime()
+}
+
+/** Per-model usage across DSH, Codex and WorkBuddy. Cursor has no model granularity. */
+async function usageModels(days = 1) {
+  const span = [1, 7, 30].includes(Number(days)) ? Number(days) : 1
+  const now = Date.now()
+  const since = localDayStart(now) - (span - 1) * 86_400_000
+  const models = []
+
+  try {
+    const rows = await sqliteJson(
+      path.join(os.homedir(), '.dsh', 'bot', 'usage.sqlite'),
+      `SELECT provider, model, SUM(input + cache_read + cache_write + output) AS tokens, COUNT(*) AS calls ` +
+      `FROM calls WHERE time >= ${since} GROUP BY provider, model ORDER BY tokens DESC`,
+    )
+    for (const row of rows) {
+      models.push({ source: 'DSH', provider: row.provider || null, model: row.model || 'unknown', tokens: Number(row.tokens) || 0, calls: Number(row.calls) || 0 })
+    }
+  } catch { /* DSH may not be installed */ }
+
+  try {
+    const rows = await sqliteJson(
+      path.join(os.homedir(), '.workbuddy', 'workbuddy.db'),
+      `SELECT s.model AS model, u.credit_json AS credit_json FROM session_usage u ` +
+      `LEFT JOIN sessions s ON s.id = u.session_id WHERE u.updated_at >= ${since}`,
+    )
+    const byModel = new Map()
+    for (const row of rows) {
+      const model = row.model || 'unknown'
+      let credits = 0
+      try {
+        const map = JSON.parse(row.credit_json || '{}')
+        for (const value of Object.values(map)) credits += Number(value) || 0
+      } catch { /* skip */ }
+      const item = byModel.get(model) || { source: 'WorkBuddy', model, credits: 0, sessions: 0 }
+      item.credits += credits
+      item.sessions += 1
+      byModel.set(model, item)
+    }
+    models.push(...byModel.values())
+  } catch { /* WorkBuddy may not be installed */ }
+
+  try {
+    const files = await walkJsonl(path.join(os.homedir(), '.codex', 'sessions'))
+    const byModel = new Map()
+    for (const file of files) {
+      let text
+      try { text = await fsp.readFile(file, 'utf8') } catch { continue }
+      let model = 'unknown'
+      for (const line of text.split(/\r?\n/)) {
+        if (!line) continue
+        let event
+        try { event = JSON.parse(line) } catch { continue }
+        const payload = event.payload || {}
+        if (event.type === 'turn_context' && payload.model) model = payload.model
+        if (event.type === 'session_meta' && payload.model) model = payload.model
+        if (payload.type !== 'token_count') continue
+        const at = Date.parse(event.timestamp)
+        if (!Number.isFinite(at) || at < since) continue
+        const tokens = Number(payload.info && payload.info.last_token_usage && payload.info.last_token_usage.total_tokens) || 0
+        const item = byModel.get(model) || { source: 'Codex', model, tokens: 0, calls: 0 }
+        item.tokens += tokens
+        item.calls += 1
+        byModel.set(model, item)
+      }
+    }
+    models.push(...byModel.values())
+  } catch { /* no Codex sessions */ }
+
+  models.sort((a, b) => (Number(b.tokens) || 0) - (Number(a.tokens) || 0) || (Number(b.credits) || 0) - (Number(a.credits) || 0))
+  return { ok: true, days: span, since, models, updatedAt: now }
 }
 
 async function status(options = {}) {
@@ -332,6 +416,7 @@ module.exports = {
   formatMoney,
   formatTokens,
   status,
+  usageModels,
   workbuddyUsage,
   zcodeStatus,
 }
