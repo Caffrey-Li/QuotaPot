@@ -1,0 +1,60 @@
+{
+  "rows": [
+    {
+      "offsetHours": -2,
+      "session": "session-demo-a",
+      "provider": "deepseek-account",
+      "model": "deepseek-flash",
+      "kind": "chat",
+      "live": 1,
+      "input": 100,
+      "cache_read": 50,
+      "cache_write": 10,
+      "output": 40,
+      "owner": "bot:demo-a",
+      "name": "示例 Bot"
+    },
+    {
+      "offsetHours": -1,
+      "session": "session-demo-a",
+      "provider": "deepseek-account",
+      "model": "deepseek-flash",
+      "kind": "chat",
+      "live": 1,
+      "input": 50,
+      "cache_read": 25,
+      "cache_write": 5,
+      "output": 20,
+      "owner": "bot:demo-a",
+      "name": "示例 Bot"
+    },
+    {
+      "offsetHours": -48,
+      "session": "session-demo-b",
+      "provider": "deepseek-account",
+      "model": "deepseek-v4-flash",
+      "kind": "chat",
+      "live": 1,
+      "input": 10,
+      "cache_read": 0,
+      "cache_write": 0,
+      "output": 5,
+      "owner": "room:demo",
+      "name": "示例群"
+    },
+    {
+      "offsetHours": -960,
+      "session": "session-demo-old",
+      "provider": "deepseek-account",
+      "model": "deepseek-flash",
+      "kind": "chat",
+      "live": 1,
+      "input": 1000,
+      "cache_read": 0,
+      "cache_write": 0,
+      "output": 0,
+      "owner": "agent:old",
+      "name": "示例 Agent"
+    }
+  ]
+}

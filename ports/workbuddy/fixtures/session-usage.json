@@ -1,0 +1,35 @@
+{
+  "source": "~/.workbuddy/workbuddy.db · session_usage（脱敏）",
+  "note": "session_id 与 credit_json 的键（请求 ID，32 位十六进制）已换成假值，去掉了真实会话编号。used 是上下文 token，size 是上下文窗口，updated_at 是毫秒。",
+  "now": 1792931522123,
+  "rows": [
+    {
+      "sessionId": "11111111-1111-4111-8111-111111111111",
+      "used": 246000,
+      "size": 300000,
+      "updatedAt": 1792931521123,
+      "creditJson": "{\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\":12.5}"
+    },
+    {
+      "sessionId": "22222222-2222-4222-8222-222222222222",
+      "used": 40000,
+      "size": 192000,
+      "updatedAt": 1792931400000,
+      "creditJson": "{\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\":3.2,\"cccccccccccccccccccccccccccccccc\":4.8}"
+    },
+    {
+      "sessionId": "33333333-3333-4333-8333-333333333333",
+      "used": 170000,
+      "size": 192000,
+      "updatedAt": 1791000000000,
+      "creditJson": ""
+    },
+    {
+      "sessionId": "44444444-4444-4444-8444-444444444444",
+      "used": 190000,
+      "size": 192000,
+      "updatedAt": 1792066521123,
+      "creditJson": "{\"dddddddddddddddddddddddddddddddd\":30}"
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "note": "用来跑四条提示词的对话样本，数字取自 session_usage 的真实量级，已脱敏。",
+  "chat": {
+    "id": "11111111-1111-4111-8111-111111111111",
+    "name": "示例对话一",
+    "model": "hy4-preview",
+    "percent": 82,
+    "used": 246000,
+    "limit": 300000,
+    "workspace": "quotapot",
+    "credits": 12.5
+  }
+}

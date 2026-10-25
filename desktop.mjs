@@ -1,0 +1,520 @@
+#!/usr/bin/env node
+import { execFile, execFileSync, spawn, spawnSync } from 'node:child_process'
+import fs from 'node:fs'
+import { rm, stat, statfs } from 'node:fs/promises'
+import http from 'node:http'
+import os from 'node:os'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { promisify } from 'node:util'
+import { diskTargets } from './disk.mjs'
+import {
+  contextSave,
+  contextTrend,
+  cursorPromptUrl,
+  formatTokens,
+  modelStatus,
+  summarizeCursor,
+} from './ports/cursor/index.mjs'
+import { degrade } from './ports/degrade.mjs'
+import { getPort, installedPorts, ports } from './ports/registry.mjs'
+
+export { diskTargets }
+export { contextSave, contextTrend, cursorPromptUrl, formatTokens, modelStatus, summarizeCursor }
+
+const execFileAsync = promisify(execFile)
+const ROOT = path.dirname(fileURLToPath(import.meta.url))
+const UI = path.join(ROOT, 'ui', 'index.html')
+const PORT = Number(process.env.QUOTAPOT_PORT) || 18765
+const HOST = '127.0.0.1'
+
+async function walkJsonl(dir, out = []) {
+  let entries
+  try {
+    entries = await fs.promises.readdir(dir, { withFileTypes: true })
+  } catch {
+    return out
+  }
+  for (const entry of entries) {
+    const full = path.join(dir, entry.name)
+    if (entry.isDirectory()) await walkJsonl(full, out)
+    else if (entry.isFile() && entry.name.endsWith('.jsonl')) out.push(full)
+  }
+  return out
+}
+
+async function readTail(file, bytes) {
+  const handle = await fs.promises.open(file, 'r')
+  try {
+    const info = await handle.stat()
+    const length = Math.min(info.size, bytes)
+    const buffer = Buffer.alloc(length)
+    await handle.read(buffer, 0, length, Math.max(0, info.size - length))
+    const text = buffer.toString('utf8')
+    return info.size > bytes ? text.slice(text.indexOf('\n') + 1) : text
+  } finally {
+    await handle.close()
+  }
+}
+
+function rateLimitsFromText(text) {
+  let latest = null
+  let latestAt = 0
+  for (const line of String(text).split(/\r?\n/)) {
+    if (!line.includes('rate_limits')) continue
+    let event
+    try {
+      event = JSON.parse(line)
+    } catch {
+      continue
+    }
+    const payload = event.payload
+    const limits = payload && payload.type === 'token_count' ? payload.rate_limits : null
+    const at = Date.parse(event.timestamp)
+    if (!limits || !Number.isFinite(at) || at < latestAt) continue
+    latest = limits
+    latestAt = at
+  }
+  return latest
+}
+
+function windowOf(raw) {
+  if (!raw) return null
+  return {
+    usedPercent: Number(raw.used_percent) || 0,
+    resetsAt: Number(raw.resets_at) || null,
+  }
+}
+
+async function codexUsage() {
+  const files = await walkJsonl(path.join(os.homedir(), '.codex', 'sessions'))
+  if (files.length === 0) return { ok: false, error: '没有 Codex 会话' }
+  const ranked = []
+  for (const file of files) {
+    try {
+      const info = await fs.promises.stat(file)
+      ranked.push({ file, mtime: info.mtimeMs })
+    } catch { /* skip a file that disappears mid-scan */ }
+  }
+  ranked.sort((a, b) => b.mtime - a.mtime)
+  let latest = null
+  // ponytail: sessions are 1.4GB; the menu only needs the newest rate limit. Read the tail, not every file.
+  for (const item of ranked.slice(0, 3)) {
+    latest = rateLimitsFromText(await readTail(item.file, 512 * 1024))
+    if (latest) break
+  }
+  return {
+    ok: true,
+    sessions: ranked.length,
+    limit: latest === null ? null : {
+      primary: windowOf(latest.primary),
+      secondary: windowOf(latest.secondary),
+    },
+  }
+}
+
+function wrap(result, label) {
+  if (result.status === 'fulfilled') return result.value
+  return { ok: false, error: `${label}：${String(result.reason && result.reason.message ? result.reason.message : result.reason).slice(0, 200)}` }
+}
+
+export async function collectStatus() {
+  const cursor = getPort('cursor')
+  const [menu, codex] = await Promise.allSettled([
+    cursor ? cursor.menu() : Promise.resolve(degrade('没有 Cursor 端口')),
+    codexUsage(),
+  ])
+  return {
+    ok: true,
+    cursor: wrap(menu, 'Cursor'),
+    codex: wrap(codex, 'Codex'),
+    updatedAt: Date.now(),
+  }
+}
+
+function homeOf(target) {
+  const home = os.homedir()
+  return String(target || '').startsWith(home) ? `~${String(target).slice(home.length)}` : target
+}
+
+let lastDisk = null
+
+export async function scanDisk({ fresh = false } = {}) {
+  if (!fresh && lastDisk && Date.now() - lastDisk.scannedAt < 60_000) return lastDisk
+  return scanDiskProgress(() => {})
+}
+
+async function directorySize(targetPath) {
+  try {
+    const { stdout } = await execFileAsync('du', ['-sk', targetPath], { timeout: 30_000, maxBuffer: 1024 * 1024 })
+    const kb = Number.parseInt(String(stdout).split(/\s+/)[0], 10)
+    return Number.isFinite(kb) ? kb * 1024 : null
+  } catch {
+    return null
+  }
+}
+
+export async function scanDiskProgress(onProgress) {
+  const existing = []
+  for (const target of diskTargets()) {
+    try {
+      if ((await stat(target.path)).isDirectory()) existing.push(target)
+    } catch { /* folder is absent */ }
+  }
+  const items = []
+  let done = 0
+  const started = Date.now()
+  const report = (label) => {
+    const elapsed = Date.now() - started
+    const etaMs = done > 0 ? Math.round((elapsed / done) * Math.max(0, existing.length - done)) : null
+    onProgress({ done, total: existing.length, label, etaMs })
+  }
+  for (const target of existing) {
+    report(target.label)
+    const size = await directorySize(target.path)
+    done += 1
+    if (size !== null) items.push({ ...target, path: homeOf(target.path), size })
+    report(target.label)
+  }
+  let free = null
+  try {
+    const info = await statfs(os.homedir())
+    free = info.bavail * info.bsize
+  } catch { /* free space is optional */ }
+  items.sort((a, b) => b.size - a.size)
+  lastDisk = { ok: true, items, free, thresholdGB: 3, scannedAt: Date.now() }
+  return lastDisk
+}
+
+export function cleanTargets(ids) {
+  const known = new Map(diskTargets().map((item) => [item.id, item]))
+  const accepted = []
+  const rejected = []
+  for (const id of Array.isArray(ids) ? ids : []) {
+    const target = known.get(String(id))
+    if (target) accepted.push(target)
+    else rejected.push(String(id))
+  }
+  return { accepted, rejected }
+}
+
+export async function cleanDisk(ids) {
+  const { accepted, rejected } = cleanTargets(ids)
+  const cleaned = []
+  const errors = rejected.map((id) => ({ id, error: 'UNKNOWN' }))
+  let freed = 0
+  for (const target of accepted) {
+    const size = await directorySize(target.path) ?? 0
+    try {
+      await rm(target.path, { recursive: true, force: true })
+      freed += size
+      cleaned.push(target.id)
+    } catch (error) {
+      errors.push({ id: target.id, error: String(error?.message ?? error).slice(0, 160) })
+    }
+  }
+  return { ok: errors.length === 0, freed, cleaned, errors }
+}
+
+function readBody(request) {
+  return new Promise((resolve, reject) => {
+    const chunks = []
+    let size = 0
+    request.on('data', (chunk) => {
+      size += chunk.length
+      if (size > 64_000) {
+        reject(new Error('BODY_TOO_LARGE'))
+        request.destroy()
+        return
+      }
+      chunks.push(chunk)
+    })
+    request.on('end', () => {
+      const text = Buffer.concat(chunks).toString('utf8')
+      if (!text) {
+        resolve({})
+        return
+      }
+      try {
+        resolve(JSON.parse(text))
+      } catch (error) {
+        reject(error)
+      }
+    })
+    request.on('error', reject)
+  })
+}
+
+function sendJson(response, status, body) {
+  const payload = JSON.stringify(body)
+  response.writeHead(status, {
+    'content-type': 'application/json; charset=utf-8',
+    'cache-control': 'no-store',
+    'content-length': Buffer.byteLength(payload),
+  })
+  response.end(payload)
+}
+
+function openSse(response) {
+  response.writeHead(200, {
+    'content-type': 'text/event-stream; charset=utf-8',
+    'cache-control': 'no-store',
+    connection: 'keep-alive',
+  })
+  return (event) => response.write(`data: ${JSON.stringify(event)}\n\n`)
+}
+
+async function routePort(request, response, url) {
+  const match = url.pathname.match(/^\/api\/ports(?:\/([a-z0-9-]+))?(\/.*)?$/)
+  if (!match) return false
+  if (!match[1]) {
+    sendJson(response, 200, { ok: true, ports: installedPorts() })
+    return true
+  }
+  const port = getPort(match[1])
+  if (!port) {
+    sendJson(response, 404, degrade('没有这个端口'))
+    return true
+  }
+  const sub = match[2] || ''
+  try {
+    if (request.method === 'GET' && sub === '/usage/stream') {
+      const send = openSse(response)
+      const cached = port.peekUsage(url.searchParams.get('days'))
+      if (cached) send({ type: 'cached', usage: cached })
+      const result = await port.usage(url.searchParams.get('days'), (progress) => send({ type: 'progress', ...progress }))
+      send({ type: 'done', usage: result })
+      response.end()
+      return true
+    }
+    if (request.method === 'GET' && sub === '/models') {
+      sendJson(response, 200, port.models())
+      return true
+    }
+    if (request.method === 'GET' && sub === '/context/stream') {
+      const send = openSse(response)
+      const cached = port.peekContext()
+      if (cached) send({ type: 'cached', context: cached })
+      const result = await port.chats((progress) => send({ type: 'progress', ...progress }))
+      send({ type: 'done', context: result })
+      response.end()
+      return true
+    }
+    if (request.method === 'GET' && sub === '/headers') {
+      sendJson(response, 200, port.headers())
+      return true
+    }
+    if (request.method === 'POST' && sub === '/prompts') {
+      const body = await readBody(request)
+      sendJson(response, 200, port.prompts(body.kind, body.chat))
+      return true
+    }
+    if (request.method === 'POST' && sub === '/paste') {
+      const body = await readBody(request)
+      sendJson(response, 200, await port.paste({ text: body.text, chatId: body.chatId }))
+      return true
+    }
+    if (request.method === 'POST' && sub === '/spawn') {
+      const body = await readBody(request)
+      sendJson(response, 200, await port.spawn(body))
+      return true
+    }
+    if (request.method === 'POST' && sub === '/open') {
+      const body = await readBody(request)
+      sendJson(response, 200, await port.open({ chatId: body.chatId, phase: body.phase, ticket: body.ticket }))
+      return true
+    }
+  } catch (error) {
+    if (!response.headersSent) sendJson(response, 500, degrade(String(error.message || error)))
+    else response.end()
+    return true
+  }
+  return false
+}
+
+function serve() {
+  const html = fs.readFileSync(UI)
+  const server = http.createServer(async (request, response) => {
+    const url = new URL(request.url || '/', `http://${HOST}:${PORT}`)
+    if (request.method === 'GET' && (url.pathname === '/' || url.pathname === '/index.html')) {
+      response.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' })
+      response.end(html)
+      return
+    }
+    if (await routePort(request, response, url)) return
+    if (request.method === 'GET' && url.pathname === '/api/status') {
+      try {
+        sendJson(response, 200, await collectStatus())
+      } catch (error) {
+        sendJson(response, 500, { ok: false, error: String(error.message || error) })
+      }
+      return
+    }
+    if (request.method === 'GET' && url.pathname === '/api/disk/stream') {
+      const send = openSse(response)
+      try {
+        const disk = await scanDiskProgress((progress) => send({ type: 'progress', ...progress }))
+        send({ type: 'done', disk })
+      } catch (error) {
+        send({ type: 'error', error: String(error.message || error) })
+      }
+      response.end()
+      return
+    }
+    if (request.method === 'GET' && url.pathname === '/api/disk') {
+      try {
+        sendJson(response, 200, await scanDisk({ fresh: url.searchParams.get('fresh') === '1' }))
+      } catch (error) {
+        sendJson(response, 500, { ok: false, error: String(error.message || error) })
+      }
+      return
+    }
+    if (request.method === 'POST' && url.pathname === '/api/disk/clean') {
+      try {
+        const body = await readBody(request)
+        sendJson(response, 200, await cleanDisk(body.ids))
+      } catch (error) {
+        sendJson(response, 500, { ok: false, error: String(error.message || error) })
+      }
+      return
+    }
+    response.writeHead(404)
+    response.end()
+  })
+  server.listen(PORT, HOST, () => {
+    process.stdout.write(`QUOTAPOT_LISTEN ${HOST}:${PORT}\n`)
+  })
+}
+
+function findNode() {
+  if (process.execPath && fs.existsSync(process.execPath)) return process.execPath
+  return 'node'
+}
+
+function appDir() {
+  const system = '/Applications/QuotaPot.app'
+  try {
+    fs.accessSync('/Applications', fs.constants.W_OK)
+    return system
+  } catch {
+    return path.join(os.homedir(), 'Applications', 'QuotaPot.app')
+  }
+}
+
+function install() {
+  const dest = appDir()
+  const macos = path.join(dest, 'Contents', 'MacOS')
+  const resources = path.join(dest, 'Contents', 'Resources')
+  fs.mkdirSync(macos, { recursive: true })
+  fs.mkdirSync(resources, { recursive: true })
+  const binary = path.join(macos, 'QuotaPot')
+  execFileSync('/usr/bin/swiftc', [
+    '-O', '-parse-as-library',
+    path.join(ROOT, 'native', 'Window.swift'),
+    '-o', binary,
+    '-framework', 'Cocoa',
+    '-framework', 'WebKit',
+    '-framework', 'ApplicationServices',
+  ], { stdio: 'inherit' })
+  fs.writeFileSync(path.join(resources, 'plugin-root.txt'), ROOT)
+  fs.writeFileSync(path.join(resources, 'node-path.txt'), findNode())
+  const icon = path.join(ROOT, 'native', 'AppIcon.icns')
+  if (fs.existsSync(icon)) fs.copyFileSync(icon, path.join(resources, 'AppIcon.icns'))
+  fs.writeFileSync(path.join(dest, 'Contents', 'Info.plist'), `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleExecutable</key><string>QuotaPot</string>
+  <key>CFBundleIdentifier</key><string>dev.quotapot.desktop</string>
+  <key>CFBundleName</key><string>QuotaPot</string>
+  <key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleIconFile</key><string>AppIcon</string>
+  <key>CFBundleShortVersionString</key><string>0.4.1</string>
+  <key>LSMinimumSystemVersion</key><string>13.0</string>
+  <key>NSHighResolutionCapable</key><true/>
+  <key>NSAppTransportSecurity</key>
+  <dict><key>NSAllowsLocalNetworking</key><true/></dict>
+</dict>
+</plist>
+`)
+  process.stdout.write(`installed ${dest}\n`)
+  return dest
+}
+
+function selfCheck() {
+  const summary = summarizeCursor({
+    planUsage: { limit: 2000, includedSpend: 500, remaining: 1500, totalPercentUsed: 25 },
+  }, 'Pro')
+  if (summary.usedPercent !== 25 || summary.remainingCents !== 1500 || summary.planName !== 'Pro' || summary.unit !== 'percent') {
+    throw new Error(`summarizeCursor failed: ${JSON.stringify(summary)}`)
+  }
+  const derived = summarizeCursor({ planUsage: { limit: 1000, includedSpend: 250 } })
+  if (derived.remainingCents !== 750 || derived.usedPercent !== 25) {
+    throw new Error(`derived percent failed: ${JSON.stringify(derived)}`)
+  }
+  if (formatTokens(1500) !== '1.5K') throw new Error(`formatTokens failed: ${formatTokens(1500)}`)
+  const targets = diskTargets()
+  const byId = new Map(targets.map((item) => [item.id, item]))
+  if (byId.get('cursor')?.safe !== false || byId.get('cursor-cache')?.safe !== true) {
+    throw new Error('disk safety flags drifted')
+  }
+  const plan = cleanTargets(['cursor', 'cursor-cache', '../etc'])
+  if (plan.accepted.map((item) => item.id).join(',') !== 'cursor,cursor-cache' || plan.rejected[0] !== '../etc') {
+    throw new Error('threshold must not decide what can be cleaned')
+  }
+  const trend = contextTrend([
+    { at: 1, used: 100 },
+    { at: 2, used: 180 },
+    { at: 3, used: 40 },
+    { at: 4, used: 90 },
+  ])
+  if (/^[0-9a-f-]{36}$/i.test('not-an-id')) throw new Error('open chat id check is wrong')
+  const promptUrl = cursorPromptUrl('交接', 'demo')
+  if (!promptUrl.startsWith('cursor://anysphere.cursor-deeplink/prompt?') || !promptUrl.includes('workspace=demo')) {
+    throw new Error('new chat link is wrong')
+  }
+  if (trend.compactions !== 1 || Math.abs(trend.lostRatio - (140 / 180)) > 0.001 || Math.abs(trend.growth + 0.1) > 0.001) {
+    throw new Error(`context trend failed: ${JSON.stringify(trend)}`)
+  }
+  if (/from '\//.test(fs.readFileSync(fileURLToPath(import.meta.url), 'utf8'))) {
+    throw new Error('desktop.mjs imports a file outside the project')
+  }
+  const html = fs.readFileSync(UI, 'utf8')
+  if (html.includes('quotapot_status')) throw new Error('UI still exposes the MCP tool')
+  if (modelStatus(1).statusText !== '降级' || modelStatus(2).statusText !== '停用' || modelStatus(0).detail) {
+    throw new Error('model status text drifted')
+  }
+  for (const label of ['用量', '模型', '对话', '空间', '工具', '阈值', '上下文消耗增幅', '整理', '一键整理', '继承对话', '一键开新', '耗时', '崩溃', '无耗时']) {
+    if (!html.includes(label)) throw new Error(`UI missing ${label}`)
+  }
+  if (html.includes('data-tab="balance"') || html.includes('data-tab="agents"')) {
+    throw new Error('UI still has balance or agents tabs')
+  }
+  if (!html.includes('quotapot.diskThresholdGB') || !html.includes('80%')) {
+    throw new Error('UI drifted from the context threshold')
+  }
+  if (contextSave(0.8 * 256000) < 100000) throw new Error('80% context no longer pays back a tidy')
+  if (contextSave(0.5 * 256000) >= 100000) throw new Error('threshold is below the measured payback')
+  if (html.includes('class="sea"') || html.includes('class="whale"')) {
+    throw new Error('UI still has the window whale')
+  }
+  if (!html.includes('row-sheen') || !html.includes('/api/ports/')) {
+    throw new Error('chat rows cannot open or highlight')
+  }
+  for (const port of ports) {
+    const check = path.join(ROOT, 'ports', port.id, 'check.mjs')
+    const result = spawnSync(process.execPath, [check], { stdio: 'inherit' })
+    if (result.status !== 0) throw new Error(`${port.id} check failed`)
+  }
+  console.log('quotapot self-check ok')
+}
+
+const args = process.argv.slice(2)
+const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+if (isMain && args.includes('--check')) selfCheck()
+else if (isMain && args.includes('--install')) {
+  const dest = install()
+  spawn('open', [dest], { detached: true, stdio: 'ignore' }).unref()
+} else if (isMain) {
+  serve()
+}

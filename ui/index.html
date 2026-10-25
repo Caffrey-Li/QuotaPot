@@ -1,0 +1,1078 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>QuotaPot</title>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body { position: relative; }
+  body {
+    background: #eef1f8;
+    color: #1c1c1e;
+    font: 13px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+    padding: 12px 16px 16px;
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  .card {
+    background: #fff; border-radius: 16px; border: 1px solid rgba(120,120,128,.16);
+    box-shadow: 0 10px 28px rgba(30, 40, 80, .08);
+    padding: 14px 14px 12px; flex: 1; min-height: 0;
+    display: flex; flex-direction: column;
+  }
+  .head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .brand { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; letter-spacing: 1.4px; color: #6e6e73; }
+  .mark { width: 22px; height: 22px; border-radius: 6px; }
+  button.refresh {
+    all: unset; cursor: pointer; color: #6e6e73; font-size: 16px; width: 22px; height: 22px;
+    text-align: center; border-radius: 6px;
+  }
+  button.refresh:hover { background: rgba(120,120,128,.12); color: #1c1c1e; }
+  button.refresh.spin { animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .tabs { display: flex; gap: 4px; margin: 10px 0 4px; padding: 3px; border-radius: 10px; background: rgba(120,120,128,.10); }
+  .tab {
+    all: unset; flex: 1; text-align: center; cursor: pointer; padding: 5px 0; border-radius: 8px;
+    font-size: 12px; font-weight: 600; color: #6e6e73;
+  }
+  .tab.active { background: #fff; color: #1c1c1e; box-shadow: 0 1px 3px rgba(0,0,0,.10); }
+  .view[hidden] { display: none !important; }
+  #usage, #space, #tools, #chats, #models { flex: 1; min-height: 0; }
+  #space, #tools, #usage, #chats, #models { display: flex; flex-direction: column; overflow: hidden; }
+  #space[hidden], #usage[hidden], #tools[hidden], #chats[hidden], #models[hidden] { display: none !important; }
+  .ranges { display: flex; gap: 4px; margin-top: 8px; }
+  .range { all: unset; flex: 1; text-align: center; cursor: pointer; padding: 4px 0; border-radius: 7px;
+    font-size: 12px; color: #6e6e73; background: rgba(120,120,128,.09); }
+  .range.active { background: rgba(77,107,254,.13); color: #3b55d9; font-weight: 650; }
+  .usage-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; align-content: start; padding-top: 10px; }
+  .usage-list > .meta { grid-column: 1 / -1; }
+  .stat-card { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 14px; border-radius: 12px; background: rgba(120,120,128,.08); }
+  .stat-main { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+  .u-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #1c1c1e; font-size: 13px; font-weight: 600; }
+  .u-tokens { flex: none; font-size: 18px; font-weight: 700; letter-spacing: -.3px; font-variant-numeric: tabular-nums; text-align: right; }
+  .u-span { color: #8e8e93; font-size: 12px; font-variant-numeric: tabular-nums; }
+  .u-bad { color: #b25000; }
+  .u-dead { color: #ff453a; }
+  .model-note { color: #8e8e93; font-size: 12px; line-height: 1.4; }
+  .total { margin-top: 10px; font-size: 28px; font-weight: 680; letter-spacing: -.4px; font-variant-numeric: tabular-nums; }
+  .sub { margin-top: 2px; font-size: 12px; color: #6e6e73; }
+  .bar { margin-top: 8px; height: 5px; border-radius: 99px; background: rgba(120,120,128,.16); overflow: hidden; }
+  .bar > i { display: block; height: 100%; width: 0; background: #4d6bfe; }
+  .scan-progress .bar > i { position: relative; overflow: hidden; transition: width .16s linear; }
+  .scan-progress .bar > i::after {
+    content: ""; position: absolute; top: 0; bottom: 0; width: 45%; left: -45%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,.75), transparent);
+    animation: scan-gloss .9s linear infinite;
+  }
+  @keyframes scan-gloss { to { left: 130%; } }
+  .bar.warn > i { background: #ff9f0a; }
+  .bar.err > i { background: #ff453a; }
+  .meta { margin-top: 8px; font-size: 11px; color: #8e8e93; }
+  .space-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; flex-shrink: 0; }
+  .scan, .clean { all: unset; cursor: pointer; font-size: 12px; font-weight: 650; border-radius: 8px; padding: 5px 10px; }
+  .scan { color: #3b55d9; background: rgba(77,107,254,.12); }
+  .clean { color: #fff; background: #4d6bfe; }
+  .clean:disabled { opacity: .4; cursor: default; }
+  .free { font-size: 11px; color: #8e8e93; font-variant-numeric: tabular-nums; }
+  .disk { margin-top: 6px; flex: 1; min-height: 0; overflow: auto; }
+  .disk-row { display: grid; grid-template-columns: 16px minmax(0,1fr) auto; gap: 8px; align-items: center;
+    padding: 6px 0; border-bottom: 1px solid rgba(120,120,128,.08); font-size: 12px; cursor: pointer; }
+  .disk-row input { accent-color: #4d6bfe; margin: 0; width: 12px; height: 12px; }
+  .name { color: #3a3a3c; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .path { display: block; font-size: 10px; color: #8e8e93; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .size { font-weight: 650; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .tag { margin-left: 4px; font-size: 10px; font-weight: 500; color: #8e8e93; }
+  .tag.over { color: #b25000; }
+  .foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; flex-shrink: 0; background: #fff; }
+  .threshold { display: flex; align-items: center; gap: 4px; font-size: 11px; color: #8e8e93; }
+  .threshold input { width: 44px; box-sizing: border-box; border: 1px solid rgba(120,120,128,.22); border-radius: 6px;
+    padding: 2px 4px; font: inherit; font-variant-numeric: tabular-nums; color: inherit; background: transparent; }
+  .threshold input:focus { outline: 1px solid #4d6bfe; outline-offset: 1px; }
+  .hint { margin-top: 8px; font-size: 11px; color: #8e8e93; line-height: 1.45; flex-shrink: 0; background: #fff; }
+  .scan-progress { margin-top: 8px; flex-shrink: 0; }
+  .scan-progress .bar { margin-top: 0; }
+  .scan-progress .meta { margin-top: 4px; }
+  .scan-progress[hidden] { display: none !important; }
+  .split { display: flex; gap: 4px; margin-top: 8px; }
+  .usage-list, .tool-body { flex: 1; min-height: 0; overflow: auto; }
+  .warn-banner { margin-top: 8px; padding: 8px; border-radius: 8px; background: rgba(255,159,10,.16); color: #8a4b00; font-size: 12px; line-height: 1.45; }
+  .chat-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; }
+  .chat-head .meta { margin-top: 0; }
+  #tidy-all { all: unset; cursor: pointer; flex: none; font-size: 11px; font-weight: 650; color: #fff; background: #b25000; border-radius: 6px; padding: 4px 8px; }
+  #tidy-all:disabled { opacity: .4; cursor: default; }
+  #chat-job:empty { display: none; }
+  .ctx-row { position: relative; overflow: hidden; display: grid; grid-template-columns: minmax(0, 1fr) 96px; column-gap: 16px; align-items: center;
+    padding: 14px 2px 16px; border-bottom: 1px solid rgba(120,120,128,.1); font-size: 12px; cursor: pointer; }
+  .ctx-main { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+  .ctx-main .bar { margin-top: 0; }
+  .ctx-actions { display: flex; flex-direction: column; justify-content: center; gap: 6px; }
+  .ctx-row::before { content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(105deg, transparent 36%, rgba(77,107,254,.2) 50%, transparent 64%);
+    transform: translateX(-130%); }
+  .ctx-row:hover { background: rgba(77,107,254,.08); }
+  .ctx-row:hover::before { animation: row-sheen .55s ease; }
+  .ctx-row:active { background: rgba(77,107,254,.16); }
+  .ctx-row.opening { background: rgba(77,107,254,.12); }
+  @keyframes row-sheen { from { transform: translateX(-130%); } to { transform: translateX(130%); } }
+  .ctx-top { display: flex; align-items: center; gap: 8px; }
+  .ctx-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #3a3a3c; font-weight: 650; }
+  .ctx-pct { flex: none; font-weight: 650; font-variant-numeric: tabular-nums; color: #1c1c1e; }
+  .ctx-meta, .ctx-stats { color: #8e8e93; font-size: 11px; }
+  .ctx-stats { color: #3a3a3c; font-variant-numeric: tabular-nums; }
+  .prompt { margin-top: 8px; border: 1px solid rgba(120,120,128,.16); border-radius: 8px; overflow: hidden; }
+  .prompt-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 8px; background: rgba(120,120,128,.06); font-size: 12px; font-weight: 650; }
+  .prompt .copy { all: unset; cursor: pointer; font-size: 11px; font-weight: 650; color: #3b55d9; }
+  .prompt-code { margin: 0; padding: 8px; max-height: 112px; overflow: auto; white-space: pre-wrap; word-break: break-word;
+    font: 11px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; color: #1c1c1e; cursor: pointer; background: #f7f8fc; }
+  .head-actions { display: flex; align-items: center; gap: 4px; flex: none; }
+  .frame-switch { display: flex; gap: 2px; padding: 2px; border-radius: 8px; background: rgba(120,120,128,.10); }
+  .frame-switch[hidden] { display: none; }
+  #port-switch { margin-top: 8px; flex-wrap: wrap; gap: 6px; padding: 0; background: transparent; }
+  #port-switch button { padding: 4px 10px; border-radius: 999px; background: #fff; color: #8e8e93; box-shadow: inset 0 0 0 1px #e4e4ee; }
+  #port-switch button.active { background: #738bea; color: #fff; box-shadow: none; }
+  .frame-switch button { all: unset; cursor: pointer; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 650; color: #6e6e73; white-space: nowrap; }
+  .frame-switch button.active { background: #fff; color: #1c1c1e; box-shadow: 0 1px 2px rgba(0,0,0,.10); }
+  .act { all: unset; cursor: pointer; text-align: center; font-size: 11px; font-weight: 650; border-radius: 6px; padding: 4px 0; }
+  .act.tidy { color: #fff; background: #b25000; }
+  .act.renew { color: #9a4500; background: rgba(178,80,0,.12); }
+  .act.heir { color: #fff; background: #4d6bfe; }
+  .act:hover { filter: brightness(1.06); transform: translateY(-1px); }
+  .act.wait { opacity: .55; pointer-events: none; }
+  @media (prefers-reduced-motion: reduce) {
+    .scan-progress .bar > i, .scan-progress .bar > i::after, .ctx-row, .ctx-row::before, .act { animation: none !important; transition: none !important; }
+  }
+  .switch { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 12px; color: #3a3a3c; }
+  .ask { position: absolute; left: 16px; right: 16px; bottom: 16px; z-index: 20; background: #fff; border-radius: 12px;
+    box-shadow: 0 12px 32px rgba(30,40,80,.18); padding: 12px; }
+  .ask[hidden] { display: none !important; }
+  .ask p { margin: 0 0 8px; font-size: 13px; }
+  .ask-actions { display: flex; justify-content: flex-end; gap: 8px; }
+  .ask button { all: unset; cursor: pointer; font-size: 12px; font-weight: 650; border-radius: 8px; padding: 5px 10px; }
+  .ask .yes { color: #fff; background: #4d6bfe; }
+  .ask .no { color: #3a3a3c; background: rgba(120,120,128,.12); }
+</style>
+<section class="card">
+  <div class="head">
+    <div class="brand"><img class="mark" alt="" width="22" height="22" src="data:image/png;base64,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">QUOTAPOT</div>
+    <div class="head-actions">
+      <div class="frame-switch" id="frame-toggle">
+        <button type="button" data-mode="compact">收起</button>
+        <button type="button" data-mode="expanded">展开</button>
+      </div>
+      <button class="refresh" id="refresh" type="button" title="刷新">↻</button>
+    </div>
+  </div>
+  <div class="frame-switch" id="port-switch" hidden></div>
+  <div class="tabs">
+    <button class="tab active" type="button" data-tab="usage">用量</button>
+    <button class="tab" type="button" data-tab="models">模型</button>
+    <button class="tab" type="button" data-tab="chats">对话</button>
+    <button class="tab" type="button" data-tab="tools">工具</button>
+    <button class="tab" type="button" data-tab="space">空间</button>
+  </div>
+  <div class="view" id="usage">
+    <div class="ranges">
+      <button class="range active" type="button" data-days="1">今日</button>
+      <button class="range" type="button" data-days="7">7 天</button>
+      <button class="range" type="button" data-days="30">30 天</button>
+    </div>
+    <div class="scan-progress" id="usage-progress" hidden>
+      <div class="bar"><i id="usage-fill"></i></div>
+      <div class="meta" id="usage-label">读取中</div>
+    </div>
+    <div class="total" id="usage-total">—</div>
+    <div class="sub" id="usage-sub"></div>
+    <div class="usage-list" id="usage-list"></div>
+    <div class="meta" id="usage-note">按模型看 Cursor 的 token 消耗，含输入、输出和缓存。</div>
+  </div>
+  <div class="view" id="models" hidden>
+    <div class="meta" id="model-head"></div>
+    <div class="usage-list" id="model-list"></div>
+    <div class="meta" id="model-note"></div>
+  </div>
+  <div class="view" id="chats" hidden>
+    <div class="chat-head">
+      <div class="meta" id="chat-threshold">阈值 80%。再继续做，整理后开新比留在这条对话更省。</div>
+      <button id="tidy-all" type="button" disabled>一键整理</button>
+    </div>
+    <div class="meta" id="chat-job"></div>
+    <div class="scan-progress" id="chat-progress" hidden>
+      <div class="bar"><i id="chat-fill"></i></div>
+      <div class="meta" id="chat-label">扫描中</div>
+    </div>
+    <div class="tool-body" id="chat-list"></div>
+  </div>
+  <div class="view" id="tools" hidden>
+    <div class="scan-progress" id="tool-progress" hidden>
+      <div class="bar"><i id="tool-fill"></i></div>
+      <div class="meta" id="tool-label">检查中</div>
+    </div>
+    <label class="switch"><input id="ask-agents" type="checkbox" checked> 新对话开启时询问是否先建立 AGENTS.md</label>
+    <div class="tool-body" id="tool-body"></div>
+  </div>
+  <div class="view" id="space" hidden>
+    <div class="space-actions">
+      <button class="scan" id="scan" type="button">扫描 AI 工具</button>
+      <span class="free" id="free"></span>
+    </div>
+    <div class="scan-progress" id="scan-progress" hidden>
+      <div class="bar"><i id="scan-fill"></i></div>
+      <div class="meta" id="scan-label">扫描中</div>
+    </div>
+    <div class="disk" id="disk"></div>
+    <div class="foot">
+      <label class="threshold">阈值
+        <input id="threshold" class="disk-threshold-input" type="number" min="1" step="1" inputmode="numeric" value="3" aria-label="阈值">
+        GB
+      </label>
+      <button class="clean" id="clean" type="button" disabled>清理选中 (0)</button>
+    </div>
+    <div class="hint" id="space-hint">阈值只用于高亮，不影响勾选和清理。标为只读的是用户数据，删除会丢掉会话、设置和快照。</div>
+  </div>
+</section>
+<div class="ask" id="agents-ask" hidden>
+  <p id="agents-text">新对话已开始。要先把建立 AGENTS.md 的提示词贴进去吗？</p>
+  <div class="ask-actions">
+    <button class="no" id="agents-no" type="button">不用</button>
+    <button class="yes" id="agents-yes" type="button">贴进去</button>
+  </div>
+</div>
+<script>
+  const $ = (id) => document.getElementById(id)
+  const compact = new Intl.NumberFormat('zh-CN', { notation: 'compact', maximumFractionDigits: 1 })
+  let portId = 'cursor'
+  let portCaps = { actions: { open: true, paste: true, spawn: true } }
+  let portPrompt = { product: 'Cursor', instructionsFile: 'AGENTS.md' }
+  const portPath = (suffix) => '/api/ports/' + portId + suffix
+  const can = (action) => portCaps?.actions?.[action] !== false
+  function formatAmount(value, unit) {
+    const n = Number(value) || 0
+    if (unit === 'credits') return compact.format(n) + ' 积分'
+    if (unit === 'percent') return Math.round(n) + '%'
+    if (unit === 'currency') return '¥' + n.toFixed(2)
+    return compact.format(n)
+  }
+  const bytes = (value) => {
+    const n = Number(value) || 0
+    if (n >= 1024 ** 3) return (n / 1024 ** 3).toFixed(2) + ' GB'
+    if (n >= 1024 ** 2) return (n / 1024 ** 2).toFixed(1) + ' MB'
+    return Math.round(n / 1024) + ' KB'
+  }
+  const THRESHOLD_KEY = 'quotapot.diskThresholdGB'
+  let disk = null
+  let days = 1
+  let thresholdGB = 3
+  let cleanConfirm = false
+  const selected = new Set()
+  try {
+    const saved = Number(localStorage.getItem(THRESHOLD_KEY))
+    if (Number.isFinite(saved) && saved > 0) thresholdGB = saved
+  } catch { /* storage may be unavailable */ }
+  $('threshold').value = String(thresholdGB)
+
+  let usageData = null
+  let contextData = null
+  let warnPercent = 80
+  const TIDY_KEY = 'quotapot.tidied.v2'
+  const HEIR_KEY = 'quotapot.inherited'
+  const loadIdSet = (key) => {
+    try { return new Set(JSON.parse(localStorage.getItem(key) || '[]')) } catch { return new Set() }
+  }
+  const saveIdSet = (key, set) => {
+    try { localStorage.setItem(key, JSON.stringify([...set])) } catch { /* ignore */ }
+  }
+  const tidied = loadIdSet(TIDY_KEY)
+  const inherited = loadIdSet(HEIR_KEY)
+  let jobRunning = false
+  const seenChats = new Set()
+  let pendingChat = null
+  const sessionStart = Date.now()
+  const ASK_KEY = 'quotapot.askAgents'
+  const opened = { chats: false, tools: false, space: false }
+  try {
+    if (localStorage.getItem(ASK_KEY) === '0') $('ask-agents').checked = false
+  } catch { /* storage may be unavailable */ }
+
+  function show(name) {
+    for (const id of ['usage', 'models', 'chats', 'tools', 'space']) $(id).hidden = id !== name
+    document.querySelectorAll('.tab').forEach((button) => button.classList.toggle('active', button.dataset.tab === name))
+    if (name === 'usage') loadUsage()
+    if (name === 'models') loadModels()
+    if (name === 'chats' && !opened.chats) { opened.chats = true; loadContext() }
+    if (name === 'tools' && !opened.tools) { opened.tools = true; loadTools() }
+    if (name === 'space' && !opened.space) { opened.space = true; loadDisk(true) }
+  }
+  document.querySelectorAll('.tab').forEach((button) => button.addEventListener('click', () => show(button.dataset.tab)))
+
+  function renderUsage(usage) {
+    document.querySelectorAll('[data-days]').forEach((button) => button.classList.toggle('active', Number(button.dataset.days) === days))
+    const list = $('usage-list')
+    list.innerHTML = ''
+    if (!usage || usage.degraded || !usage.ok) {
+      $('usage-total').textContent = '—'
+      $('usage-sub').textContent = (usage && (usage.reason || usage.error)) || '用量不可用'
+      $('usage-note').textContent = ''
+      list.innerHTML = ''
+      return
+    }
+    const rows = usage.models || []
+    const label = days === 1 ? '今日' : days === 7 ? '7 天' : '30 天'
+    $('usage-total').textContent = formatAmount(usage.tokens || 0, usage.unit || 'token')
+    $('usage-sub').textContent = usage.unit && usage.unit !== 'token'
+      ? label + ' · ' + formatAmount(usage.tokens || 0, usage.unit)
+      : label + ' · ' + (usage.calls || 0) + ' 次调用 · 输入、输出和缓存合计'
+    const unit = usage.unit || 'token'
+    const unitNote = unit === 'credits'
+      ? '的积分消耗。'
+      : unit === 'currency'
+        ? '的金额。'
+        : unit === 'percent'
+          ? '的占用比例。'
+          : '的 token 消耗，含输入、输出和缓存。'
+    $('usage-note').textContent = usage.truncated
+      ? (usage.truncatedNote || '记录较多，只汇总了最近 3000 条。')
+      : '按模型看 ' + portPrompt.product + ' ' + unitNote
+    for (const item of rows.slice(0, 40)) {
+      const card = document.createElement('div')
+      card.className = 'stat-card'
+      const main = document.createElement('div')
+      main.className = 'stat-main'
+      const name = document.createElement('div')
+      name.className = 'u-name'
+      name.textContent = item.model
+      const calls = document.createElement('div')
+      calls.className = 'u-span'
+      calls.textContent = (item.calls || 0) + ' 次调用'
+      const tokens = document.createElement('div')
+      tokens.className = 'u-tokens'
+      tokens.textContent = formatAmount(item.tokens || 0, usage.unit || 'token')
+      main.append(name, calls)
+      card.append(main, tokens)
+      list.append(card)
+    }
+    if (!rows.length) {
+      const empty = document.createElement('div')
+      empty.className = 'meta'
+      empty.textContent = '这段时间没有 ' + portPrompt.product + ' 的记录。'
+      list.append(empty)
+    }
+  }
+
+  function updateClean() {
+    const count = selected.size
+    $('clean').disabled = count === 0
+    $('clean').textContent = (cleanConfirm ? '确认清理' : '清理选中') + ' (' + count + ')'
+  }
+
+  function renderDisk() {
+    const threshold = thresholdGB * 1073741824
+    const input = $('threshold')
+    if (document.activeElement !== input) input.value = String(thresholdGB)
+    const list = $('disk')
+    list.innerHTML = ''
+    if (!disk || !disk.ok) return
+    $('free').textContent = Number.isFinite(disk.free) ? '可用 ' + bytes(disk.free) : ''
+    for (const item of disk.items || []) {
+      const row = document.createElement('div')
+      row.className = 'disk-row'
+      const box = document.createElement('input')
+      box.type = 'checkbox'
+      box.checked = selected.has(item.id)
+      box.addEventListener('change', () => {
+        if (box.checked) selected.add(item.id)
+        else selected.delete(item.id)
+        cleanConfirm = false
+        updateClean()
+      })
+      row.addEventListener('click', (event) => {
+        if (event.target === box) return
+        box.checked = !box.checked
+        box.dispatchEvent(new Event('change'))
+      })
+      const name = document.createElement('div')
+      name.innerHTML = '<div class="name"></div><span class="path"></span>'
+      name.querySelector('.name').textContent = item.label
+      name.querySelector('.path').textContent = item.path
+      const size = document.createElement('div')
+      size.className = 'size'
+      const over = item.size >= threshold
+      size.innerHTML = bytes(item.size) + '<span class="tag' + (over ? ' over' : '') + '"></span>'
+      size.querySelector('.tag').textContent = over
+        ? '超过 ' + thresholdGB + 'GB' + (item.safe ? '' : ' · 只读')
+        : (item.safe ? '可清理' : '只读')
+      row.append(box, name, size)
+      list.append(row)
+    }
+    updateClean()
+  }
+
+  let usageToken = 0
+  let modelsToken = 0
+  let contextToken = 0
+  let toolsToken = 0
+  function renderModels(data) {
+    if (!data || data.degraded || data.ok === false) {
+      $('model-head').textContent = (data && (data.reason || data.headline)) || '读不到模型目录'
+      $('model-note').textContent = ''
+      $('model-list').innerHTML = ''
+      return
+    }
+    $('model-head').textContent = data.headline || '读不到模型目录'
+    $('model-note').textContent = data.note || ''
+    const list = $('model-list')
+    list.innerHTML = ''
+    for (const item of (data && data.models) || []) {
+      const card = document.createElement('div')
+      card.className = 'stat-card'
+      const main = document.createElement('div')
+      main.className = 'stat-main'
+      const name = document.createElement('div')
+      name.className = 'u-name'
+      name.textContent = item.name
+      const speed = document.createElement('div')
+      speed.className = 'u-span'
+      speed.textContent = item.speed == null ? '无耗时' : item.speed + ' tokens/s'
+      main.append(name, speed)
+      if (item.detail) {
+        const note = document.createElement('div')
+        note.className = 'model-note'
+        note.textContent = (item.vendor ? item.vendor + ' · ' : '') + item.detail
+        main.append(note)
+      }
+      const status = document.createElement('div')
+      status.className = 'u-tokens' + (item.status === 2 ? ' u-dead' : item.status === 1 ? ' u-bad' : '')
+      status.textContent = item.statusText
+      card.append(main, status)
+      list.append(card)
+    }
+  }
+  async function loadModels() {
+    const token = ++modelsToken
+    const data = await fetch(portPath('/models'), { cache: 'no-store' }).then((response) => response.json()).catch(() => ({ ok: false, degraded: true, reason: '读不到模型目录' }))
+    if (token !== modelsToken) return
+    renderModels(data)
+  }
+  async function loadUsage() {
+    const token = ++usageToken
+    const label = days === 1 ? '今日' : days === 7 ? '7 天' : '30 天'
+    $('usage-sub').textContent = label + ' · 正在读取'
+    showScanProgress('usage', 0, 1, '用量', days === 1 ? 2500 : 12000)
+    try {
+      const labelText = label
+      const usage = await readEventStream(portPath('/usage/stream?days=' + days), (event) => {
+        if (token !== usageToken) return
+        showScanProgress('usage', event.done, event.total, event.label, event.etaMs)
+      }, (cached) => {
+        if (token !== usageToken || !cached) return
+        renderUsage(cached)
+        $('usage-sub').textContent = labelText + ' · 正在更新'
+      })
+      if (token !== usageToken) return
+      usageData = usage
+      renderUsage(usage || { ok: false, error: '用量没有返回' })
+    } catch (error) {
+      if (token !== usageToken) return
+      renderUsage({ ok: false, error: error.message })
+    } finally {
+      if (token === usageToken) hideScan('usage')
+    }
+  }
+  function formatEta(ms) {
+    const seconds = Math.max(1, Math.round((Number(ms) || 0) / 1000))
+    if (seconds < 60) return '大约还需 ' + seconds + ' 秒'
+    return '大约还需 ' + Math.max(1, Math.round(seconds / 60)) + ' 分钟'
+  }
+  const scanMotion = new Map()
+  function hideScan(prefix) {
+    const state = scanMotion.get(prefix)
+    if (state) clearInterval(state.timer)
+    scanMotion.delete(prefix)
+    const progress = $(prefix + '-progress')
+    if (progress) progress.hidden = true
+    const fill = $(prefix + '-fill')
+    if (fill) fill.style.width = '0%'
+  }
+  function paintScan(prefix) {
+    const state = scanMotion.get(prefix)
+    if (!state) return
+    const pct = Math.round(state.shown)
+    $(prefix + '-fill').style.width = Math.max(2, state.shown).toFixed(1) + '%'
+    const remain = state.eta - (Date.now() - state.started)
+    const eta = pct < 100 && remain > 400 ? ' · ' + formatEta(remain) : ''
+    $(prefix + '-label').textContent = (state.label ? '正在扫描 ' + state.label : '扫描中') + ' ' + pct + '%' + eta
+  }
+  function tickScan(prefix) {
+    const state = scanMotion.get(prefix)
+    const progress = $(prefix + '-progress')
+    if (!state || !progress || progress.hidden) return hideScan(prefix)
+    const elapsed = Date.now() - state.started
+    const guess = Math.min(90, (elapsed / Math.max(state.eta, 800)) * 88)
+    const crawl = Math.min(16, elapsed / 70)
+    const target = state.real >= 100 ? 100 : Math.max(state.real, guess, crawl)
+    const gap = target - state.shown
+    if (gap > 0.2) state.shown += Math.max(0.45, gap * 0.32)
+    state.shown = Math.min(state.real >= 100 ? 100 : 97, state.shown)
+    paintScan(prefix)
+  }
+  function showScanProgress(prefix, done, total, label, etaMs) {
+    const progress = $(prefix + '-progress')
+    progress.hidden = false
+    const real = total ? Math.min(100, Math.round((done / total) * 100)) : 0
+    let state = scanMotion.get(prefix)
+    if (!state) {
+      state = { shown: 2, real: 0, started: Date.now(), eta: 8000, label: '', timer: 0 }
+      scanMotion.set(prefix, state)
+      state.timer = setInterval(() => tickScan(prefix), 80)
+    }
+    state.real = real
+    if (label) state.label = label
+    if (Number(etaMs) > 0) state.eta = (Date.now() - state.started) + Number(etaMs)
+    tickScan(prefix)
+  }
+  async function readDiskStream() {
+    const response = await fetch('/api/disk/stream', { cache: 'no-store' })
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    let result = null
+    while (true) {
+      const chunk = await reader.read()
+      if (chunk.done) break
+      buffer += decoder.decode(chunk.value, { stream: true })
+      const parts = buffer.split('\n\n')
+      buffer = parts.pop()
+      for (const part of parts) {
+        const line = part.split('\n').find((item) => item.startsWith('data: '))
+        if (!line) continue
+        const event = JSON.parse(line.slice(6))
+        if (event.type === 'progress') showScanProgress('scan', event.done, event.total, event.label, event.etaMs)
+        else if (event.type === 'done') result = event.disk
+        else if (event.type === 'error') throw new Error(event.error || '扫描失败')
+      }
+    }
+    if (!result) throw new Error('扫描没有返回结果')
+    return result
+  }
+  async function loadDisk(fresh) {
+    $('scan').textContent = '扫描中'
+    $('scan').disabled = true
+    if (fresh) showScanProgress('scan', 0, 1, '', null)
+    try {
+      disk = fresh
+        ? await readDiskStream()
+        : await fetch('/api/disk', { cache: 'no-store' }).then((response) => response.json())
+      if (!(Number(localStorage.getItem(THRESHOLD_KEY)) > 0) && Number(disk.thresholdGB) > 0) {
+        thresholdGB = Number(disk.thresholdGB)
+      }
+      selected.clear()
+      cleanConfirm = false
+      renderDisk()
+    } finally {
+      hideScan('scan')
+      $('scan').textContent = '扫描 AI 工具'
+      $('scan').disabled = false
+    }
+  }
+
+  $('refresh').addEventListener('click', () => {
+    $('refresh').classList.add('spin')
+    const done = !$('space').hidden ? loadDisk(true) : !$('chats').hidden ? loadContext() : !$('tools').hidden ? loadTools() : !$('models').hidden ? loadModels() : loadUsage()
+    Promise.resolve(done).finally(() => $('refresh').classList.remove('spin'))
+  })
+  document.querySelectorAll('[data-days]').forEach((button) => button.addEventListener('click', () => {
+    days = Number(button.dataset.days)
+    loadUsage()
+  }))
+  $('scan').addEventListener('click', () => loadDisk(true))
+  $('threshold').addEventListener('change', () => {
+    thresholdGB = Math.max(1, Number($('threshold').value) || 3)
+    $('threshold').value = String(thresholdGB)
+    try { localStorage.setItem(THRESHOLD_KEY, String(thresholdGB)) } catch { /* ignore */ }
+    renderDisk()
+  })
+  $('clean').addEventListener('click', async () => {
+    if (!selected.size) return
+    if (!cleanConfirm) {
+      cleanConfirm = true
+      updateClean()
+      return
+    }
+    $('clean').disabled = true
+    const result = await fetch('/api/disk/clean', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ids: [...selected] }),
+    }).then((response) => response.json())
+    $('space-hint').textContent = result.ok || Number(result.freed) > 0
+      ? '已释放 ' + bytes(result.freed)
+      : '清理失败'
+    cleanConfirm = false
+    await loadDisk(true)
+  })
+
+  function percentText(value) {
+    return Math.round(Number(value) || 0) + '%'
+  }
+  function formatDuration(ms) {
+    if (!Number.isFinite(ms) || ms < 60_000) return ms > 0 ? '不到 1 分钟' : '耗时未知'
+    const minutes = Math.round(ms / 60000)
+    if (minutes < 60) return minutes + ' 分钟'
+    const hours = Math.floor(minutes / 60)
+    const rest = minutes % 60
+    return rest ? hours + ' 小时 ' + rest + ' 分' : hours + ' 小时'
+  }
+  function statsLine(chat) {
+    const spent = chat.used == null ? '消耗未知' : '消耗 ' + compact.format(chat.used || 0) + ' token'
+    const elapsed = chat.createdAt > 0 && chat.updatedAt >= chat.createdAt
+      ? formatDuration(chat.updatedAt - chat.createdAt)
+      : '耗时未知'
+    return spent + ' · 耗时 ' + elapsed
+  }
+  async function promptText(kind, chat) {
+    const data = await fetch(portPath('/prompts'), {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ kind, chat: chat || null }),
+    }).then((response) => response.json()).catch(() => ({ ok: false, degraded: true, reason: '读不到提示词' }))
+    return data.ok ? data.text : ''
+  }
+  function promptCard(title, text) {
+    const card = document.createElement('div')
+    card.className = 'prompt'
+    const head = document.createElement('div')
+    head.className = 'prompt-head'
+    const label = document.createElement('span')
+    label.textContent = title
+    const button = document.createElement('button')
+    button.className = 'copy'
+    button.type = 'button'
+    button.dataset.label = '复制'
+    button.textContent = '复制'
+    const code = document.createElement('pre')
+    code.className = 'prompt-code'
+    code.tabIndex = 0
+    code.title = '点击后复制，并粘贴到 ' + portPrompt.product + ' 当前输入框'
+    code.textContent = text
+    let timer = null
+    const mark = (message) => {
+      button.textContent = message
+      clearTimeout(timer)
+      timer = setTimeout(() => { button.textContent = '复制' }, 1600)
+    }
+    button.addEventListener('click', async (event) => {
+      event.stopPropagation()
+      try { await navigator.clipboard.writeText(text) } catch { /* clipboard may be denied */ }
+      mark('已复制')
+    })
+    code.addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(text) } catch { /* clipboard may be denied */ }
+      mark('已复制')
+      const result = await fetch(portPath('/paste'), {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ text }),
+      }).then((response) => response.json()).catch(() => ({ ok: false }))
+      mark(result.ok ? '已粘贴' : '已复制')
+    })
+    head.append(label, button)
+    card.append(head, code)
+    return card
+  }
+  function trendLine(chat) {
+    const growth = chat.growth == null ? '' : ' · 上下文消耗增幅 ' + (chat.growth >= 0 ? '+' : '') + percentText(chat.growth * 100)
+    const counted = chat.compactions == null ? '' : '压缩 ' + chat.compactions + ' 次 · 丢失率未测'
+    if (!chat.measured) {
+      const head = (chat.model || '未知模型') + ' · '
+      if (chat.percent == null) return head + '上下文未知' + (counted ? ' · ' + counted : '')
+      if (counted) return head + counted
+      return chat.warn ? head + '未采样压缩' : head + '未超过 ' + warnPercent + '%，未采样压缩'
+    }
+    const lost = percentText((chat.lostRatio || 0) * 100)
+    return (chat.model || '未知模型') + ' · 压缩 ' + chat.compactions + ' 次 · 预估丢失 ' + lost + growth
+  }
+  async function openChat(id, row) {
+    row.classList.add('opening')
+    const post = (body) => fetch(portPath('/open'), {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    }).then((response) => response.json()).catch(() => ({ ok: false, error: '没能连上 QuotaPot' }))
+    const arm = await post({ chatId: id, phase: 'arm' })
+    const bridge = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.quotapot
+    if (arm.ok && arm.bridge && bridge) bridge.postMessage({ action: 'focusChat' })
+    if (arm.ok) {
+      await new Promise((resolve) => setTimeout(resolve, 900))
+      await post({ phase: 'done', ticket: arm.ticket })
+    }
+    row.classList.remove('opening')
+    row.title = !arm.ok ? (arm.error || '没能切换') : arm.bridge && bridge ? '已切到 Cursor 里的这条对话' : '已打开 ' + portPrompt.product + ' 里的这条对话'
+  }
+  async function placePrompt(text, composerId, button) {
+    const result = await fetch(portPath('/paste'), {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ text, chatId: composerId }),
+    }).then((response) => response.json()).catch(() => ({ ok: false }))
+    if (!button) return result
+    button.textContent = result.placed ? '已放入' : result.ok ? '已粘贴' : '失败'
+    setTimeout(() => { button.textContent = button.dataset.label || '复制' }, 1600)
+    return result
+  }
+  function pendingTidy() {
+    return ((contextData && contextData.chats) || []).filter((chat) => chat.warn && !tidied.has(chat.id) && !inherited.has(chat.id))
+  }
+  function setJob(text) {
+    $('chat-job').textContent = text || ''
+  }
+  function actionButton(label, className, onClick) {
+    const button = document.createElement('button')
+    button.className = 'act ' + className
+    button.type = 'button'
+    button.textContent = label
+    button.addEventListener('click', (event) => {
+      event.stopPropagation()
+      onClick(button)
+    })
+    return button
+  }
+  const chatBusy = new Map()
+  async function tidyChat(chat) {
+    if (chatBusy.has(chat.id)) return { ok: false, error: '正在整理' }
+    const name = chat.name || '这条对话'
+    chatBusy.set(chat.id, '整理中')
+    renderContext(contextData)
+    let result
+    try {
+      result = await placePrompt(await promptText('handoff', chat), chat.id)
+    } catch (error) {
+      result = { ok: false, error: error.message || '整理失败' }
+    }
+    if (result && result.placed) {
+      tidied.add(chat.id)
+      saveIdSet(TIDY_KEY, tidied)
+      setJob('「' + name + '」已整理，交接提示词已放进这条对话。')
+    } else {
+      setJob('「' + name + '」没有整理：' + ((result && (result.error || result.reason)) || '没有写入'))
+    }
+    chatBusy.delete(chat.id)
+    renderContext(contextData)
+    return result
+  }
+  async function spawnHeir(chat) {
+    const result = await fetch(portPath('/spawn'), {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ text: await promptText('inherit', chat), workspace: chat.workspace || '' }),
+    }).then((response) => response.json()).catch(() => ({ ok: false, error: '没能连上 QuotaPot' }))
+    if (result.ok) {
+      inherited.add(chat.id)
+      saveIdSet(HEIR_KEY, inherited)
+    }
+    return result
+  }
+  async function tidyAll() {
+    const chats = pendingTidy()
+    if (!chats.length || jobRunning) return
+    if (!window.confirm('依次整理 ' + chats.length + ' 条超过 ' + warnPercent + '% 的对话？提示词会放进各自的输入框，不会切到 Cursor。')) return
+    jobRunning = true
+    $('tidy-all').disabled = true
+    let ok = 0
+    let failed = 0
+    try {
+      for (let index = 0; index < chats.length; index += 1) {
+        showScanProgress('chat', index, chats.length, chats[index].name || '对话', null)
+        const result = await tidyChat(chats[index])
+        if (result && result.placed) ok += 1
+        else failed += 1
+      }
+      showScanProgress('chat', chats.length, chats.length, '完成', 0)
+    } finally {
+      hideScan('chat')
+      jobRunning = false
+      renderContext(contextData)
+    }
+    setJob('一键整理完成：成功 ' + ok + ' 条' + (failed ? '，失败 ' + failed + ' 条' : '') + '。')
+  }
+  async function renewChat(chat) {
+    if (jobRunning) return
+    const name = chat.name || '这条对话'
+    if (!window.confirm('先整理「' + name + '」，再在原项目里开新对话继承内容？不会切到 Cursor。')) return
+    jobRunning = true
+    $('tidy-all').disabled = true
+    try {
+      showScanProgress('chat', 0, 2, '整理 ' + name, null)
+      const tidiedResult = tidied.has(chat.id) ? { placed: true } : await tidyChat(chat)
+      if (!tidiedResult || !tidiedResult.placed) {
+        setJob('「' + name + '」没能整理，新对话没有开。')
+        return
+      }
+      showScanProgress('chat', 1, 2, '开新 ' + name, null)
+      const spawned = await spawnHeir(chat)
+      showScanProgress('chat', 2, 2, '完成', 0)
+      const where = chat.workspace ? '项目 ' + chat.workspace : '当前窗口'
+      setJob(spawned.ok
+        ? '「' + name + '」已整理，并在' + where + '开了新对话。'
+        : '「' + name + '」已整理，开新失败：' + (spawned.error || '未知原因'))
+    } finally {
+      hideScan('chat')
+      jobRunning = false
+      renderContext(contextData)
+    }
+  }
+  function renderContext(data) {
+    const root = $('chat-list')
+    root.innerHTML = ''
+    const waiting = pendingTidy()
+    $('tidy-all').hidden = !can('paste')
+    $('tidy-all').disabled = jobRunning || !waiting.length || !can('paste')
+    if (!data || data.degraded || !data.ok) {
+      const error = document.createElement('div')
+      error.className = 'meta'
+      error.textContent = (data && (data.reason || data.error)) || '读不到对话上下文'
+      root.append(error)
+      return
+    }
+    const chats = data.chats || []
+    if (data.warnPercent) warnPercent = data.warnPercent
+    const threshold = $('chat-threshold')
+    if (threshold) threshold.textContent = '阈值 ' + warnPercent + '%。再继续做，整理后开新比留在这条对话更省。'
+    const hot = chats.filter((item) => item.warn)
+    if (hot.length) {
+      const banner = document.createElement('div')
+      banner.className = 'warn-banner'
+      banner.textContent = hot.length + ' 条对话达到 ' + warnPercent + '%。整理会把交接提示词放进该对话。一键开新会先整理，再在原项目开新对话。'
+      root.append(banner)
+    }
+    for (const chat of chats.slice(0, 30)) {
+      const row = document.createElement('div')
+      row.className = 'ctx-row'
+      const main = document.createElement('div')
+      main.className = 'ctx-main'
+      const top = document.createElement('div')
+      top.className = 'ctx-top'
+      const name = document.createElement('div')
+      name.className = 'ctx-name'
+      name.textContent = chat.name || '未命名对话'
+      const pct = document.createElement('div')
+      pct.className = 'ctx-pct'
+      pct.textContent = chat.percent == null ? '未知' : percentText(chat.percent)
+      top.append(name, pct)
+      const meta = document.createElement('div')
+      meta.className = 'ctx-meta'
+      meta.textContent = trendLine(chat)
+      const stats = document.createElement('div')
+      stats.className = 'ctx-stats'
+      stats.textContent = statsLine(chat)
+      const bar = document.createElement('div')
+      bar.className = 'bar' + (chat.percent >= 90 ? ' err' : chat.warn ? ' warn' : '')
+      if (chat.percent == null) bar.hidden = true
+      const fill = document.createElement('i')
+      fill.style.width = Math.min(100, Math.round(chat.percent || 0)) + '%'
+      bar.append(fill)
+      main.append(top, meta, stats, bar)
+      const actions = document.createElement('div')
+      actions.className = 'ctx-actions'
+      const done = inherited.has(chat.id)
+      const ready = tidied.has(chat.id)
+      const pending = chatBusy.get(chat.id)
+      if (pending) {
+        const waiting = actionButton(pending, 'tidy', () => {})
+        waiting.disabled = true
+        waiting.classList.add('wait')
+        actions.append(waiting)
+      } else if (chat.warn && !done && !ready) {
+        if (can('paste')) actions.append(actionButton('整理', 'tidy', () => tidyChat(chat).then(() => renderContext(contextData))))
+        if (can('spawn')) actions.append(actionButton('一键开新', 'renew', () => renewChat(chat)))
+      } else if (chat.warn && ready && !done && can('spawn')) {
+        actions.append(actionButton('继承对话', 'heir', async () => {
+          if (jobRunning) return
+          jobRunning = true
+          try {
+            showScanProgress('chat', 0, 1, '开新 ' + (chat.name || '对话'), null)
+            const spawned = await spawnHeir(chat)
+            const where = chat.workspace ? '项目 ' + chat.workspace : '当前窗口'
+            setJob(spawned.ok ? '已在' + where + '开了继承对话。' : ('开新失败：' + (spawned.error || '未知原因')))
+          } finally {
+            hideScan('chat')
+            jobRunning = false
+            renderContext(contextData)
+          }
+        }))
+      }
+      row.title = '打开 ' + portPrompt.product + ' 里的这条对话'
+      if (can('open')) row.addEventListener('click', () => openChat(chat.id, row))
+      row.append(main, actions)
+      root.append(row)
+    }
+  }
+  async function readEventStream(url, onProgress, onCached) {
+    const response = await fetch(url, { cache: 'no-store' })
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    let result = null
+    while (true) {
+      const chunk = await reader.read()
+      if (chunk.done) break
+      buffer += decoder.decode(chunk.value, { stream: true })
+      const parts = buffer.split('\n\n')
+      buffer = parts.pop()
+      for (const part of parts) {
+        const line = part.split('\n').find((item) => item.startsWith('data: '))
+        if (!line) continue
+        const event = JSON.parse(line.slice(6))
+        if (event.type === 'progress') onProgress(event)
+        else if (event.type === 'cached') { if (onCached) onCached(event.context || event.usage) }
+        else if (event.type === 'done') result = event.context || event.disk || event.usage
+        else if (event.type === 'error') throw new Error(event.error || '扫描失败')
+      }
+    }
+    return result
+  }
+  async function loadContext() {
+    const token = ++contextToken
+    $('chat-progress').hidden = false
+    showScanProgress('chat', 0, 1, '对话列表', 8000)
+    try {
+      const data = await readEventStream(portPath('/context/stream'), (event) => {
+        if (token !== contextToken) return
+        showScanProgress('chat', event.done, event.total, event.label, event.etaMs)
+      }, (cached) => {
+        if (token !== contextToken) return
+        contextData = cached
+        renderContext(cached)
+      })
+      if (token !== contextToken) return
+      contextData = data
+      renderContext(data)
+    } catch (error) {
+      if (token !== contextToken) return
+      renderContext({ ok: false, error: error.message })
+    } finally {
+      if (token === contextToken) hideScan('chat')
+    }
+  }
+  async function loadTools() {
+    const token = ++toolsToken
+    showScanProgress('tool', 0, 1, '新对话', 1000)
+    const started = Date.now()
+    try {
+      await fetch(portPath('/headers'), { cache: 'no-store' }).then((response) => response.json())
+      if (token !== toolsToken) return
+      const eta = Math.max(0, 1000 - (Date.now() - started))
+      showScanProgress('tool', 1, 1, '新对话', eta)
+    } finally {
+      if (token === toolsToken) hideScan('tool')
+    }
+    if (token !== toolsToken) return
+    const file = portPrompt.instructionsFile || 'AGENTS.md'
+    const cards = [
+      promptCard('新对话先建立 ' + file, await promptText('new')),
+      promptCard('整理当前对话', await promptText('handoff')),
+      promptCard('对话崩溃后开新对话', await promptText('crash')),
+    ]
+    if (token !== toolsToken) return
+    const root = $('tool-body')
+    root.innerHTML = ''
+    for (const card of cards) root.append(card)
+    const hint = document.createElement('div')
+    hint.className = 'meta'
+    hint.textContent = '开关打开时，新对话开始后会询问是否把建立 ' + file + ' 的提示词放进那条对话。复制只复制。点击代码块会粘贴到 ' + portPrompt.product + ' 当前输入框。整理和崩溃后开新的提示词也可以从这里复制。'
+    root.append(hint)
+  }
+  function askAgents(chat) {
+    if (!$('ask-agents').checked) return
+    pendingChat = chat
+    $('agents-text').textContent = '新对话' + (chat.name ? '「' + chat.name + '」' : '') + '已开始。要先把建立 ' + (portPrompt.instructionsFile || 'AGENTS.md') + ' 的提示词贴进这条对话吗？'
+    $('agents-ask').hidden = false
+  }
+  async function pollNewChats() {
+    if (!$('ask-agents').checked) return
+    let data
+    try {
+      data = await fetch(portPath('/headers'), { cache: 'no-store' }).then((response) => response.json())
+    } catch {
+      return
+    }
+    for (const chat of data.chats || []) {
+      if (seenChats.has(chat.id)) continue
+      seenChats.add(chat.id)
+      if (chat.createdAt >= sessionStart) askAgents(chat)
+    }
+  }
+
+  function syncFrameButton() {
+    const mode = window.innerWidth >= 700 ? 'expanded' : 'compact'
+    $('frame-toggle').querySelectorAll('[data-mode]').forEach((button) => {
+      button.classList.toggle('active', button.dataset.mode === mode)
+    })
+  }
+  $('tidy-all').addEventListener('click', () => tidyAll())
+  $('frame-toggle').addEventListener('click', (event) => {
+    const mode = event.target.closest('[data-mode]')?.dataset.mode
+    if (!mode || (mode === 'expanded') === (window.innerWidth >= 700)) return
+    const bridge = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.quotapot
+    if (bridge) bridge.postMessage({ mode })
+  })
+  window.addEventListener('resize', syncFrameButton)
+  syncFrameButton()
+  $('ask-agents').addEventListener('change', () => {
+    try { localStorage.setItem(ASK_KEY, $('ask-agents').checked ? '1' : '0') } catch { /* ignore */ }
+    if (!$('ask-agents').checked) $('agents-ask').hidden = true
+  })
+  $('agents-yes').dataset.label = '贴进去'
+  $('agents-no').addEventListener('click', () => {
+    pendingChat = null
+    $('agents-ask').hidden = true
+  })
+  $('agents-yes').addEventListener('click', async () => {
+    const chat = pendingChat
+    pendingChat = null
+    $('agents-ask').hidden = true
+    if (chat) await placePrompt(await promptText('new'), chat.id, $('agents-yes'))
+  })
+  async function loadPorts() {
+    try {
+      const data = await fetch('/api/ports', { cache: 'no-store' }).then((response) => response.json())
+      const installed = data.ports || []
+      if (!installed.length) return
+      let saved = ''
+      try { saved = localStorage.getItem('quotapot.port') || '' } catch { /* ignore */ }
+      const current = installed.find((item) => item.id === saved) || installed[0]
+      portId = current.id
+      portCaps = current.capabilities || portCaps
+      portPrompt = current.prompt || portPrompt
+      const box = $('port-switch')
+      box.replaceChildren()
+      if (installed.length < 2) {
+        box.hidden = true
+        return
+      }
+      box.hidden = false
+      for (const item of installed) {
+        const button = document.createElement('button')
+        button.type = 'button'
+        button.textContent = item.name
+        button.classList.toggle('active', item.id === portId)
+        button.addEventListener('click', async () => {
+          if (item.id === portId) return
+          try { localStorage.setItem('quotapot.port', item.id) } catch { /* ignore */ }
+          opened.chats = false
+          opened.tools = false
+          opened.space = false
+          usageData = null
+          contextData = null
+          await loadPorts()
+          const refresh = !$('space').hidden ? loadDisk(true) : !$('chats').hidden ? loadContext() : !$('tools').hidden ? loadTools() : !$('models').hidden ? loadModels() : loadUsage()
+          await refresh
+        })
+        box.append(button)
+      }
+    } catch { /* keep the cursor default */ }
+  }
+  loadPorts().then(() => {
+    pollNewChats()
+    setInterval(pollNewChats, 8000)
+    loadUsage()
+  })
+
+</script>

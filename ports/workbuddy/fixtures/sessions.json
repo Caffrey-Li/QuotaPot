@@ -1,0 +1,42 @@
+{
+  "source": "~/.workbuddy/workbuddy.db · sessions（脱敏）",
+  "note": "id 已换成假值，cwd 去掉了真实用户名和项目路径，标题换成示例名。model 是本机真实出现过的模型 id。",
+  "rows": [
+    {
+      "id": "11111111-1111-4111-8111-111111111111",
+      "title": "示例对话一",
+      "customTitle": "",
+      "model": "hy4-preview",
+      "cwd": "/work/quotapot",
+      "createdAt": 1792930000000,
+      "updatedAt": 1792931521123
+    },
+    {
+      "id": "22222222-2222-4222-8222-222222222222",
+      "title": "",
+      "customTitle": "示例对话二",
+      "model": "hy3",
+      "cwd": "/work/demo",
+      "createdAt": 1792931000000,
+      "updatedAt": 1792931400000
+    },
+    {
+      "id": "33333333-3333-4333-8333-333333333333",
+      "title": "示例对话三",
+      "customTitle": "",
+      "model": "hy3",
+      "cwd": "/work/demo",
+      "createdAt": 1790999000000,
+      "updatedAt": 1791000000000
+    },
+    {
+      "id": "44444444-4444-4444-8444-444444444444",
+      "title": "示例对话四",
+      "customTitle": "",
+      "model": "glm-5.2",
+      "cwd": "/work/other",
+      "createdAt": 1792000000000,
+      "updatedAt": 1792066521123
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "useOpenAIKey": false,
+  "availableDefaultModels2": [
+    {
+      "name": "demo",
+      "clientDisplayName": "Demo",
+      "serverModelName": "demo",
+      "vendorName": "example",
+      "degradationStatus": 1
+    },
+    {
+      "name": "other",
+      "clientDisplayName": "Other",
+      "serverModelName": "other",
+      "vendorName": "example",
+      "degradationStatus": 0,
+      "tooltipData": { "secondaryWarningText": "invalid api key" }
+    }
+  ]
+}

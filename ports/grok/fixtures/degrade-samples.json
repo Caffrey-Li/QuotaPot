@@ -1,0 +1,33 @@
+{
+  "usage": {
+    "ok": false,
+    "degraded": true,
+    "reason": "Grok Bot 在云端运行，本机没有用量数据"
+  },
+  "models": {
+    "ok": false,
+    "degraded": true,
+    "reason": "本机没有 Grok Bot 的模型目录"
+  },
+  "chats": {
+    "ok": false,
+    "degraded": true,
+    "reason": "对话在云端，本机没有上下文数据"
+  },
+  "headers": {
+    "ok": false,
+    "degraded": true,
+    "reason": "对话在云端，本机没有对话列表"
+  },
+  "menu": {
+    "ok": false,
+    "degraded": true,
+    "reason": "本机读不到 Grok Bot 的额度"
+  },
+  "missing": {
+    "ok": false,
+    "degraded": true,
+    "reason": "没有安装 Grok Bot",
+    "installed": false
+  }
+}

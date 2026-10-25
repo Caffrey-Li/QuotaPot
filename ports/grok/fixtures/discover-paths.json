@@ -1,0 +1,28 @@
+{
+  "installed": {
+    "appExists": true,
+    "dataExists": true,
+    "app": "/Applications/Grok Bot.app",
+    "data": "~/Library/Application Support/Grok Bot"
+  },
+  "installedNoData": {
+    "appExists": true,
+    "dataExists": false,
+    "app": "/Applications/Grok Bot.app",
+    "data": "~/Library/Application Support/Grok Bot"
+  },
+  "missing": {
+    "appExists": false,
+    "dataExists": false,
+    "app": "/Applications/Grok Bot.app",
+    "data": "~/Library/Application Support/Grok Bot"
+  },
+  "notes": {
+    "bundleId": "com.anysphere.sand",
+    "versionSeen": "0.75.8",
+    "urlSchemes": [
+      "grokbot",
+      "sand"
+    ]
+  }
+}

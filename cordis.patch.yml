@@ -1,5 +1,0 @@
-# Mounts the QuotaPot host plugin. The browser half is a small script injected
-# into the GUI's index page; there is no client build and no React dependency.
-- insert:
-    - id: quotapot
-      name: dsh-bot-quotapot

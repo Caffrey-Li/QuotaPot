@@ -1,0 +1,15 @@
+{
+  "start": 1000,
+  "events": [
+    {
+      "timestamp": 1500,
+      "model": "demo-a",
+      "tokenUsage": { "inputTokens": 10, "outputTokens": 4, "cacheReadTokens": 2, "cacheWriteTokens": 0 }
+    },
+    {
+      "timestamp": 500,
+      "model": "demo-b",
+      "tokenUsage": { "inputTokens": 100, "outputTokens": 0, "cacheReadTokens": 0, "cacheWriteTokens": 0 }
+    }
+  ]
+}

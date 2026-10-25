@@ -1,0 +1,12 @@
+{
+  "chat": {
+    "name": "示例对话",
+    "model": "demo-model",
+    "percent": 82.4,
+    "limit": 256000,
+    "used": 210944,
+    "compactions": 2,
+    "lostRatio": 0.25,
+    "workspace": "demo"
+  }
+}

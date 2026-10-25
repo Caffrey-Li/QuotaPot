@@ -1,0 +1,12 @@
+{
+  "chat": {
+    "name": "示例对话",
+    "model": "claude-sonnet-4-5-20250929",
+    "percent": 83.5,
+    "limit": 200000,
+    "used": 167005,
+    "compactions": 1,
+    "lostRatio": 0.8824,
+    "workspace": "demo"
+  }
+}
