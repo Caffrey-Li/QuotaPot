@@ -28,7 +28,6 @@ const fileCache = new Map()
 let contextSnapshot = null
 
 export function discover() {
-  if (process.platform !== 'darwin') return { ...degrade('Codex 端口目前只支持 macOS'), installed: false }
   if (!fs.existsSync(sessionsRoot())) return { ...degrade('没有找到 ~/.codex/sessions 会话目录'), installed: false }
   return { ok: true, installed: true, home: '~/.codex' }
 }

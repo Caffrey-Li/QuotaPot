@@ -27,7 +27,7 @@ const ROOT = path.dirname(fileURLToPath(import.meta.url))
 const UI = path.join(ROOT, 'ui', 'index.html')
 const PORT = Number(process.env.QUOTAPOT_PORT) || 18765
 const HOST = '127.0.0.1'
-export const VERSION = '0.5.0'
+export const VERSION = '0.5.1'
 const RELEASES = process.env.QUOTAPOT_RELEASES || 'https://github.com/Caffrey-Li/QuotaPot/releases'
 
 async function walkJsonl(dir, out = []) {
@@ -528,7 +528,34 @@ function serve() {
   })
   server.listen(PORT, HOST, () => {
     process.stdout.write(`QUOTAPOT_LISTEN ${HOST}:${PORT}\n`)
+    if (process.platform === 'win32' && !process.env.QUOTAPOT_NO_WINDOW) openDesktopWindow()
   })
+}
+
+function browserApp() {
+  const candidates = [
+    process.env.LOCALAPPDATA && path.join(process.env.LOCALAPPDATA, 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
+    'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
+    'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
+    process.env.PROGRAMFILES && path.join(process.env.PROGRAMFILES, 'Google', 'Chrome', 'Application', 'chrome.exe'),
+    process.env['PROGRAMFILES(X86)'] && path.join(process.env['PROGRAMFILES(X86)'], 'Google', 'Chrome', 'Application', 'chrome.exe'),
+  ].filter(Boolean)
+  return candidates.find((file) => fs.existsSync(file)) || null
+}
+
+export function openDesktopWindow() {
+  const url = `http://${HOST}:${PORT}/`
+  const bin = browserApp()
+  if (!bin) {
+    process.stdout.write(`请用浏览器打开 ${url}\n`)
+    return
+  }
+  const profile = path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'), 'QuotaPot', 'window')
+  spawn(bin, [`--app=${url}`, '--window-size=400,680', `--user-data-dir=${profile}`], {
+    detached: true,
+    stdio: 'ignore',
+    windowsHide: true,
+  }).unref()
 }
 
 function findNode() {
@@ -546,7 +573,16 @@ function appDir() {
   }
 }
 
+function installWindows() {
+  const dest = path.join(os.homedir(), 'Desktop', 'QuotaPot.cmd')
+  const body = `@echo off\r\n"${findNode()}" "${path.join(ROOT, 'desktop.mjs')}"\r\n`
+  fs.writeFileSync(dest, body)
+  process.stdout.write(`installed ${dest}\n`)
+  return dest
+}
+
 function install() {
+  if (process.platform === 'win32') return installWindows()
   const dest = appDir()
   const macos = path.join(dest, 'Contents', 'MacOS')
   const resources = path.join(dest, 'Contents', 'Resources')
@@ -621,6 +657,13 @@ function selfCheck() {
   if (byId.get('cursor')?.safe !== false || byId.get('cursor-cache')?.safe !== true) {
     throw new Error('disk safety flags drifted')
   }
+  const winCursor = diskTargets('win32', {
+    APPDATA: 'C:\\Users\\me\\AppData\\Roaming',
+    LOCALAPPDATA: 'C:\\Users\\me\\AppData\\Local',
+  }, 'C:\\Users\\me').find((item) => item.id === 'cursor')
+  if (!winCursor || winCursor.safe !== false || !winCursor.path.endsWith('\\Cursor')) {
+    throw new Error('windows disk paths drifted')
+  }
   const plan = cleanTargets(['cursor', 'cursor-cache', '../etc'])
   if (plan.accepted.map((item) => item.id).join(',') !== 'cursor,cursor-cache' || plan.rejected[0] !== '../etc') {
     throw new Error('threshold must not decide what can be cleaned')
@@ -678,7 +721,8 @@ if (isMain && args.includes('--check')) selfCheck()
 else if (isMain && args.includes('--build')) install()
 else if (isMain && args.includes('--install')) {
   const dest = install()
-  spawn('open', [dest], { detached: true, stdio: 'ignore' }).unref()
+  if (process.platform === 'win32') spawn('cmd.exe', ['/c', dest], { detached: true, stdio: 'ignore', windowsHide: true }).unref()
+  else spawn('open', [dest], { detached: true, stdio: 'ignore' }).unref()
 } else if (isMain) {
   serve()
 }

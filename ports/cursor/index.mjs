@@ -29,7 +29,7 @@ export const capabilities = {
   prompts: true,
   disk: true,
   menu: true,
-  actions: { open: true, paste: true, spawn: true },
+  actions: { open: process.platform === 'darwin', paste: true, spawn: true },
 }
 
 export const promptProfile = {
@@ -46,8 +46,28 @@ export function discover() {
   return { ok: true, installed: true, home: homeOf(path.dirname(path.dirname(path.dirname(file)))) }
 }
 
+export function cursorSupportDir() {
+  const home = os.homedir()
+  if (process.platform === 'win32') {
+    return path.join(process.env.APPDATA || path.join(home, 'AppData', 'Roaming'), 'Cursor')
+  }
+  if (process.platform === 'darwin') return path.join(home, 'Library', 'Application Support', 'Cursor')
+  return path.join(home, '.config', 'Cursor')
+}
+
+export function unsealCursorSecret(stored, key) {
+  const blob = Buffer.from(String(stored).slice(SECRET_PREFIX.length), 'base64')
+  if (blob.subarray(0, 3).toString() !== 'v10' || key.length !== 32 || blob.length < 3 + 12 + 16) return stored
+  const nonce = blob.subarray(3, 15)
+  const tag = blob.subarray(blob.length - 16)
+  const data = blob.subarray(15, blob.length - 16)
+  const decipher = createDecipheriv('aes-256-gcm', key, nonce)
+  decipher.setAuthTag(tag)
+  return Buffer.concat([decipher.update(data), decipher.final()]).toString('utf8')
+}
+
 export function diskTargets() {
-  const base = path.join(os.homedir(), 'Library', 'Application Support', 'Cursor')
+  const base = cursorSupportDir()
   return [
     { id: 'cursor', label: 'Cursor', path: base, safe: false, hint: 'chats, settings, snapshots' },
     { id: 'cursor-cacheddata', label: 'Cursor CachedData', path: path.join(base, 'CachedData'), safe: true },
@@ -59,14 +79,7 @@ export function diskTargets() {
 }
 
 export function cursorDbPath() {
-  const home = os.homedir()
-  if (process.platform === 'darwin') {
-    return path.join(home, 'Library', 'Application Support', 'Cursor', 'User', 'globalStorage', 'state.vscdb')
-  }
-  if (process.platform === 'win32') {
-    return path.join(process.env.APPDATA || path.join(home, 'AppData', 'Roaming'), 'Cursor', 'User', 'globalStorage', 'state.vscdb')
-  }
-  return path.join(home, '.config', 'Cursor', 'User', 'globalStorage', 'state.vscdb')
+  return path.join(cursorSupportDir(), 'User', 'globalStorage', 'state.vscdb')
 }
 
 function homeOf(target) {
@@ -104,8 +117,23 @@ function readValue(sql, params = []) {
   }
 }
 
+async function windowsSafeKey() {
+  const file = path.join(cursorSupportDir(), 'Local State')
+  const json = JSON.parse(fs.readFileSync(file, 'utf8'))
+  const raw = Buffer.from(json.os_crypt.encrypted_key, 'base64')
+  if (raw.subarray(0, 5).toString() !== 'DPAPI') throw new Error('Cursor 登录信息无法读取')
+  const encoded = raw.subarray(5).toString('base64')
+  const { stdout } = await execFileAsync('powershell.exe', [
+    '-NoProfile', '-NonInteractive', '-Command',
+    `Add-Type -AssemblyName System.Security; $b=[Convert]::FromBase64String('${encoded}'); $p=[System.Security.Cryptography.ProtectedData]::Unprotect($b,$null,'CurrentUser'); [Convert]::ToBase64String($p)`,
+  ], { encoding: 'utf8', timeout: 12_000, windowsHide: true })
+  return Buffer.from(String(stdout).trim(), 'base64')
+}
+
 async function decryptCursorSecret(stored) {
-  if (!stored.startsWith(SECRET_PREFIX) || process.platform !== 'darwin') return stored
+  if (!stored.startsWith(SECRET_PREFIX)) return stored
+  if (process.platform === 'win32') return unsealCursorSecret(stored, await windowsSafeKey())
+  if (process.platform !== 'darwin') return stored
   if (decryptedSecret && decryptedSecret.stored === stored) return decryptedSecret.plain
   if (decrypting) return decrypting
   decrypting = (async () => {
@@ -135,10 +163,12 @@ async function cursorToken() {
   try {
     stored = await decryptCursorSecret(String(storedRaw).trim())
   } catch {
-    throw new Error('需要允许钥匙串访问（Cursor Safe Storage）')
+    throw new Error(process.platform === 'win32' ? '需要允许读取 Cursor 的本机登录信息' : '需要允许钥匙串访问（Cursor Safe Storage）')
   }
   if (!stored) throw new Error('Cursor 未登录')
-  if (stored.startsWith(SECRET_PREFIX)) throw new Error('需要允许钥匙串访问（Cursor Safe Storage）')
+  if (stored.startsWith(SECRET_PREFIX)) {
+    throw new Error(process.platform === 'win32' ? '需要允许读取 Cursor 的本机登录信息' : '需要允许钥匙串访问（Cursor Safe Storage）')
+  }
   return stored
 }
 
@@ -657,11 +687,26 @@ function writeComposerDraft(composerId, text) {
 
 async function cursorIsRunning() {
   try {
+    if (process.platform === 'win32') {
+      const probe = await execFileAsync('tasklist', ['/FI', 'IMAGENAME eq Cursor.exe', '/NH'], { timeout: 4000, windowsHide: true })
+      return /Cursor\.exe/i.test(probe.stdout)
+    }
     const probe = await execFileAsync('ps', ['-ax', '-o', 'comm='], { timeout: 2000 })
     return probe.stdout.split('\n').some((line) => line.trim().endsWith('/MacOS/Cursor'))
   } catch {
     return false
   }
+}
+
+function copyToClipboard(value) {
+  return new Promise((resolve, reject) => {
+    const child = process.platform === 'win32'
+      ? spawnProcess('clip.exe', [], { windowsHide: true })
+      : spawnProcess('pbcopy')
+    child.on('error', reject)
+    child.on('close', (code) => (code === 0 ? resolve() : reject(new Error('复制失败'))))
+    child.stdin.end(value)
+  })
 }
 
 export async function paste({ text, chatId } = {}) {
@@ -677,12 +722,8 @@ export async function paste({ text, chatId } = {}) {
     }
     return { ok: true, copied: true, placed: true }
   }
-  await new Promise((resolve, reject) => {
-    const child = spawnProcess('pbcopy')
-    child.on('error', reject)
-    child.on('close', (code) => (code === 0 ? resolve() : reject(new Error('复制失败'))))
-    child.stdin.end(value)
-  })
+  await copyToClipboard(value)
+  if (process.platform !== 'darwin') return { ok: false, copied: true, error: '已复制。请在 Cursor 里粘贴。' }
   try {
     await execFileAsync('osascript', ['-e', 'tell application "Cursor" to activate\ndelay 0.2\ntell application "System Events" to keystroke "v" using command down'], { timeout: 8000 })
   } catch {
@@ -704,7 +745,8 @@ export async function spawn({ text, workspace } = {}) {
   if (!(await cursorIsRunning())) return { ok: false, error: 'Cursor 没有在运行' }
   const url = cursorPromptUrl(value, workspace)
   try {
-    await execFileAsync('open', ['-g', url], { timeout: 8000 })
+    if (process.platform === 'win32') await execFileAsync('cmd.exe', ['/c', 'start', '', url], { timeout: 8000, windowsHide: true })
+    else await execFileAsync('open', ['-g', url], { timeout: 8000 })
   } catch {
     return { ok: false, error: '没能在原项目里开新对话' }
   }
@@ -717,7 +759,7 @@ let armedBinding = null
 let armTimer = null
 
 function keybindingsPath() {
-  return path.join(os.homedir(), 'Library', 'Application Support', 'Cursor', 'User', 'keybindings.json')
+  return path.join(cursorSupportDir(), 'User', 'keybindings.json')
 }
 
 function restoreArmed(ticket) {
@@ -732,6 +774,7 @@ function restoreArmed(ticket) {
 }
 
 async function runOpen(chatId, phase, ticket) {
+  if (process.platform !== 'darwin') return { ok: false, error: 'Windows 上还不能跳进 Cursor 对话' }
   if (phase === 'done') {
     restoreArmed(Number(ticket))
     return { ok: true }

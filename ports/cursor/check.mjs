@@ -1,3 +1,4 @@
+import { createCipheriv, randomBytes } from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -14,6 +15,7 @@ import {
   promptProfile,
   prompts,
   composerRichText,
+  unsealCursorSecret,
 } from './index.mjs'
 
 const root = path.dirname(fileURLToPath(import.meta.url))
@@ -60,10 +62,17 @@ assert(!quiet.includes('上下文大约已用'), 'missing context still rendered
 assert(quiet.includes('需要压缩时可以使用 /compact。'), 'compact command was dropped')
 
 assert(modelStatus(1).statusText === '降级' && modelStatus(2).statusText === '停用' && modelStatus(0).detail === '', 'model status drifted')
-assert(capabilities.actions.paste && capabilities.actions.open && capabilities.actions.spawn, 'cursor capabilities drifted')
+assert(capabilities.actions.paste && capabilities.actions.spawn, 'cursor capabilities drifted')
+assert(capabilities.actions.open === (process.platform === 'darwin'), 'cursor open should follow the platform')
 const disks = diskTargets()
 assert(disks.find((item) => item.id === 'cursor')?.safe === false, 'cursor data was marked safe')
 assert(disks.find((item) => item.id === 'cursor-cache')?.safe === true, 'cursor cache was marked read-only')
+const sealKey = randomBytes(32)
+const nonce = randomBytes(12)
+const cipher = createCipheriv('aes-256-gcm', sealKey, nonce)
+const sealed = Buffer.concat([cipher.update('secret-token'), cipher.final(), cipher.getAuthTag()])
+const packed = `cursor-safe-storage:v1:${Buffer.concat([Buffer.from('v10'), nonce, sealed]).toString('base64')}`
+assert(unsealCursorSecret(packed, sealKey) === 'secret-token', 'windows token unwrap drifted')
 
 const source = fs.readFileSync(path.join(root, 'index.mjs'), 'utf8')
 assert(!source.includes('/usr/bin/sqlite3') && !source.includes('python3'), 'cursor port still shells out to sqlite')
