@@ -27,6 +27,8 @@ const ROOT = path.dirname(fileURLToPath(import.meta.url))
 const UI = path.join(ROOT, 'ui', 'index.html')
 const PORT = Number(process.env.QUOTAPOT_PORT) || 18765
 const HOST = '127.0.0.1'
+export const VERSION = '0.5.0'
+const RELEASES = process.env.QUOTAPOT_RELEASES || 'https://github.com/Caffrey-Li/QuotaPot/releases'
 
 async function walkJsonl(dir, out = []) {
   let entries
@@ -216,6 +218,141 @@ export async function cleanDisk(ids) {
   return { ok: errors.length === 0, freed, cleaned, errors }
 }
 
+export function newerVersion(latest, current) {
+  const a = String(latest).replace(/^v/, '').split('.').map(Number)
+  const b = String(current).replace(/^v/, '').split('.').map(Number)
+  for (let i = 0; i < 3; i += 1) {
+    if ((a[i] || 0) !== (b[i] || 0)) return (a[i] || 0) > (b[i] || 0)
+  }
+  return false
+}
+
+let updateCache = { at: 0, data: null }
+
+export async function checkUpdate({ fresh = false } = {}) {
+  const ttl = updateCache.data?.ok ? 6 * 3600_000 : 30 * 60_000
+  if (!fresh && updateCache.data && Date.now() - updateCache.at < ttl) return updateCache.data
+  let data
+  try {
+    // ponytail: the REST API allows 60 calls/hour per IP and shared proxies exhaust it; the public release pages have no such cap.
+    const options = { headers: { 'user-agent': `QuotaPot/${VERSION}` }, signal: AbortSignal.timeout(15_000) }
+    const page = await fetch(`${RELEASES}/latest`, options)
+    await page.body?.cancel()
+    if (!page.ok) throw new Error(`HTTP ${page.status}`)
+    const tag = (page.url.match(/\/tag\/([^/?#]+)$/) || [])[1]
+    if (!tag) throw new Error('网站上还没有发布的版本')
+    const assets = await fetch(`${RELEASES}/expanded_assets/${tag}`, options)
+    if (!assets.ok) throw new Error(`HTTP ${assets.status}`)
+    const href = ((await assets.text()).match(/href="([^"]*\/releases\/download\/[^"]+\.zip)"/) || [])[1]
+    const latest = decodeURIComponent(tag).replace(/^v/, '')
+    data = {
+      ok: true,
+      current: VERSION,
+      latest,
+      newer: Boolean(href) && newerVersion(latest, VERSION),
+      zip: href ? new URL(href, page.url).href : null,
+      page: page.url,
+    }
+  } catch (error) {
+    data = { ok: false, current: VERSION, newer: false, error: String(error.message || error).slice(0, 160) }
+  }
+  updateCache = { at: Date.now(), data }
+  return data
+}
+
+function findSource(dir, depth = 0) {
+  if (fs.existsSync(path.join(dir, 'desktop.mjs'))) return dir
+  if (depth >= 2) return null
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (!entry.isDirectory() || entry.name.startsWith('.') || entry.name === '__MACOSX') continue
+    const found = findSource(path.join(dir, entry.name), depth + 1)
+    if (found) return found
+  }
+  return null
+}
+
+/** Swap every top-level entry of src into root; root-only entries (.git, notes) stay. Restores on failure. */
+export function replaceFiles(src, root, backup) {
+  const names = fs.readdirSync(src).filter((name) => !name.startsWith('.') && name !== '__MACOSX')
+  fs.mkdirSync(backup, { recursive: true })
+  const saved = []
+  try {
+    for (const name of names) {
+      const target = path.join(root, name)
+      if (fs.existsSync(target)) {
+        fs.cpSync(target, path.join(backup, name), { recursive: true })
+        saved.push(name)
+      }
+      fs.rmSync(target, { recursive: true, force: true })
+      fs.cpSync(path.join(src, name), target, { recursive: true })
+    }
+  } catch (error) {
+    for (const name of names) fs.rmSync(path.join(root, name), { recursive: true, force: true })
+    for (const name of saved) fs.cpSync(path.join(backup, name), path.join(root, name), { recursive: true })
+    throw error
+  }
+  return names
+}
+
+function quotaPotAppPid() {
+  try {
+    const comm = execFileSync('/bin/ps', ['-o', 'comm=', '-p', String(process.ppid)], { encoding: 'utf8' }).trim()
+    return comm.endsWith('/MacOS/QuotaPot') ? process.ppid : null
+  } catch {
+    return null
+  }
+}
+
+let updating = false
+
+export async function installUpdate() {
+  if (updating) return { ok: false, error: '正在更新，请稍候' }
+  updating = true
+  const work = fs.mkdtempSync(path.join(os.tmpdir(), 'quotapot-update-'))
+  try {
+    const info = await checkUpdate({ fresh: true })
+    if (!info.ok) return { ok: false, error: `连不上更新服务器：${info.error}` }
+    if (!info.newer) return { ok: false, error: '已经是最新版本' }
+    const response = await fetch(info.zip, { signal: AbortSignal.timeout(120_000) })
+    if (!response.ok) return { ok: false, error: `下载失败：HTTP ${response.status}` }
+    const zip = path.join(work, 'update.zip')
+    fs.writeFileSync(zip, Buffer.from(await response.arrayBuffer()))
+    const unpacked = path.join(work, 'unpacked')
+    execFileSync('/usr/bin/ditto', ['-x', '-k', zip, unpacked])
+    const src = findSource(unpacked)
+    if (!src) return { ok: false, error: '下载的压缩包里没有 QuotaPot 程序' }
+    const check = spawnSync(process.execPath, [path.join(src, 'desktop.mjs'), '--check'], { cwd: src, encoding: 'utf8', timeout: 120_000 })
+    if (check.status !== 0 || !String(check.stdout).includes('quotapot self-check ok')) return { ok: false, error: '新版本自检没有通过，已保留当前版本' }
+    const swift = (dir) => {
+      try {
+        return fs.readFileSync(path.join(dir, 'native', 'Window.swift'), 'utf8')
+      } catch {
+        return ''
+      }
+    }
+    const rebuild = swift(src) !== swift(ROOT)
+    const backup = path.join(work, 'backup')
+    replaceFiles(src, ROOT, backup)
+    if (rebuild) {
+      const build = spawnSync(process.execPath, [path.join(ROOT, 'desktop.mjs'), '--build'], { cwd: ROOT, encoding: 'utf8', timeout: 300_000 })
+      if (build.status !== 0) {
+        replaceFiles(backup, ROOT, path.join(work, 'discard'))
+        return { ok: false, error: '新版本安装失败，已还原到当前版本' }
+      }
+    }
+    const appPid = quotaPotAppPid()
+    const restart = `sleep 1; ${appPid ? `kill ${appPid}; sleep 1; ` : ''}open ${JSON.stringify(appDir())}`
+    const env = { PATH: '/usr/bin:/bin:/usr/sbin:/sbin', HOME: os.homedir() }
+    spawn('/bin/sh', ['-c', restart], { detached: true, stdio: 'ignore', env }).unref()
+    setTimeout(() => process.exit(0), 300)
+    return { ok: true, version: info.latest, rebuilt: rebuild }
+  } catch (error) {
+    return { ok: false, error: `更新失败：${String(error.message || error).slice(0, 160)}` }
+  } finally {
+    updating = false
+  }
+}
+
 function readBody(request) {
   return new Promise((resolve, reject) => {
     const chunks = []
@@ -350,6 +487,14 @@ function serve() {
       }
       return
     }
+    if (request.method === 'GET' && url.pathname === '/api/update') {
+      sendJson(response, 200, await checkUpdate({ fresh: url.searchParams.get('fresh') === '1' }))
+      return
+    }
+    if (request.method === 'POST' && url.pathname === '/api/update/install') {
+      sendJson(response, 200, await installUpdate())
+      return
+    }
     if (request.method === 'GET' && url.pathname === '/api/disk/stream') {
       const send = openSse(response)
       try {
@@ -429,7 +574,7 @@ function install() {
   <key>CFBundleName</key><string>QuotaPot</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleIconFile</key><string>AppIcon</string>
-  <key>CFBundleShortVersionString</key><string>0.4.1</string>
+  <key>CFBundleShortVersionString</key><string>${VERSION}</string>
   <key>LSMinimumSystemVersion</key><string>13.0</string>
   <key>NSHighResolutionCapable</key><true/>
   <key>NSAppTransportSecurity</key>
@@ -453,6 +598,24 @@ function selfCheck() {
     throw new Error(`derived percent failed: ${JSON.stringify(derived)}`)
   }
   if (formatTokens(1500) !== '1.5K') throw new Error(`formatTokens failed: ${formatTokens(1500)}`)
+  if (!newerVersion('v0.10.0', '0.9.9') || newerVersion('0.5.0', '0.5.0') || newerVersion('0.4.9', '0.5.0')) {
+    throw new Error('version compare drifted')
+  }
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'quotapot-check-'))
+  const [src, root] = [path.join(tmp, 'src'), path.join(tmp, 'root')]
+  fs.mkdirSync(path.join(src, 'ports', 'a'), { recursive: true })
+  fs.mkdirSync(path.join(root, 'ports', 'old'), { recursive: true })
+  fs.mkdirSync(path.join(root, '.git'))
+  fs.writeFileSync(path.join(src, 'desktop.mjs'), 'new')
+  fs.writeFileSync(path.join(root, 'desktop.mjs'), 'old')
+  fs.writeFileSync(path.join(root, 'notes.md'), 'keep')
+  replaceFiles(src, root, path.join(tmp, 'backup'))
+  const replaced = fs.readFileSync(path.join(root, 'desktop.mjs'), 'utf8') === 'new'
+    && fs.existsSync(path.join(root, 'ports', 'a')) && !fs.existsSync(path.join(root, 'ports', 'old'))
+    && fs.existsSync(path.join(root, '.git')) && fs.existsSync(path.join(root, 'notes.md'))
+    && fs.readFileSync(path.join(tmp, 'backup', 'desktop.mjs'), 'utf8') === 'old'
+  fs.rmSync(tmp, { recursive: true, force: true })
+  if (!replaced) throw new Error('update file swap drifted')
   const targets = diskTargets()
   const byId = new Map(targets.map((item) => [item.id, item]))
   if (byId.get('cursor')?.safe !== false || byId.get('cursor-cache')?.safe !== true) {
@@ -510,8 +673,9 @@ function selfCheck() {
 }
 
 const args = process.argv.slice(2)
-const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+const isMain = process.argv[1] && fs.realpathSync(process.argv[1]) === fs.realpathSync(fileURLToPath(import.meta.url))
 if (isMain && args.includes('--check')) selfCheck()
+else if (isMain && args.includes('--build')) install()
 else if (isMain && args.includes('--install')) {
   const dest = install()
   spawn('open', [dest], { detached: true, stdio: 'ignore' }).unref()

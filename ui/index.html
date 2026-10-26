@@ -149,6 +149,12 @@
   .ask button { all: unset; cursor: pointer; font-size: 12px; font-weight: 650; border-radius: 8px; padding: 5px 10px; }
   .ask .yes { color: #fff; background: #4d6bfe; }
   .ask .no { color: #3a3a3c; background: rgba(120,120,128,.12); }
+  .update { display: flex; align-items: center; gap: 8px; margin-top: 8px; padding: 6px 6px 6px 10px; border-radius: 10px;
+    background: rgba(77,107,254,.10); color: #2c3e9e; font-size: 12px; }
+  .update[hidden] { display: none; }
+  .update span { flex: 1; }
+  .update button { all: unset; cursor: pointer; font-size: 12px; font-weight: 650; border-radius: 8px; padding: 4px 10px; color: #fff; background: #4d6bfe; }
+  .update button:disabled { cursor: default; opacity: .6; }
 </style>
 <section class="card">
   <div class="head">
@@ -161,6 +167,7 @@
       <button class="refresh" id="refresh" type="button" title="刷新">↻</button>
     </div>
   </div>
+  <div class="update" id="update" hidden role="status"><span id="update-text"></span><button type="button" id="update-go">更新</button></div>
   <div class="frame-switch" id="port-switch" hidden></div>
   <div class="tabs">
     <button class="tab active" type="button" data-tab="usage">用量</button>
@@ -1069,6 +1076,37 @@
       }
     } catch { /* keep the cursor default */ }
   }
+  async function checkUpdate() {
+    try {
+      const info = await fetch('/api/update', { cache: 'no-store' }).then((response) => response.json())
+      if (!info.newer) return
+      $('update-text').textContent = `有新版本 v${info.latest}（当前 v${info.current}）`
+      $('update').hidden = false
+    } catch { /* offline: no banner */ }
+  }
+  $('update-go').addEventListener('click', async () => {
+    const button = $('update-go')
+    button.disabled = true
+    button.textContent = '更新中…'
+    $('update-text').textContent = '正在下载并检查新版本，请不要关闭窗口'
+    let result
+    try {
+      result = await fetch('/api/update/install', { method: 'POST' }).then((response) => response.json())
+    } catch (error) {
+      result = { ok: false, error: '更新失败：' + error.message }
+    }
+    if (result.ok) {
+      button.hidden = true
+      $('update-text').textContent = result.rebuilt
+        ? `已更新到 v${result.version}，正在重启。重启后请到「系统设置 → 隐私与安全性 → 辅助功能」重新打开 QuotaPot`
+        : `已更新到 v${result.version}，正在重启…`
+      return
+    }
+    $('update-text').textContent = result.error || '更新失败'
+    button.disabled = false
+    button.textContent = '重试'
+  })
+  checkUpdate()
   loadPorts().then(() => {
     pollNewChats()
     setInterval(pollNewChats, 8000)
