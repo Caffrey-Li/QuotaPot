@@ -10,9 +10,8 @@ import { renderPrompt } from '../prompts.mjs'
 export const id = 'codex'
 export const name = 'Codex'
 export const capabilities = {
-  discover: true, usage: true, models: true, chats: true,
-  prompts: true, disk: true, menu: true,
-  actions: { open: false, paste: false, spawn: false },
+  usage: true, chats: true, quota: true, modelStatus: false,
+  actions: { open: false, paste: 'copy', spawn: false },
 }
 export const promptProfile = {
   product: 'Codex', instructionsFile: 'AGENTS.md', compactCommand: '/compact',
@@ -217,27 +216,6 @@ export async function usage(days = 1, onProgress = () => {}) {
   } catch { return degrade('无法读取 Codex 会话用量') }
 }
 
-export function modelsFromRollouts(rows) {
-  const totals = aggregate(rows, -Infinity, Infinity)
-  if (!totals.models.length) return degrade('没有带可核实用量的 Codex 模型记录')
-  return {
-    ok: true, headline: 'Codex 本地会话中记录的模型和用量',
-    note: '状态未核实；本地记录不能证明服务实时状态。没有可信的逐次生成耗时，速度显示为无耗时。用量为本地保留记录，非账单。',
-    models: totals.models.map((item) => ({
-      name: item.model, vendor: rows.find((row) => row.events.some((event) => event.model === item.model))?.vendor || '',
-      status: 1, statusText: '未核实', speed: null, unit: 'token', tokens: item.tokens,
-      detail: `本地记录 ${item.tokens} token；实时状态未核实；无耗时。`,
-    })),
-  }
-}
-
-export function models() {
-  const found = discover()
-  if (!found.ok) return found
-  try { return modelsFromRollouts(loadRollouts().rows) }
-  catch { return degrade('无法读取 Codex 模型记录') }
-}
-
 function header(row) {
   return { id: row.id, name: `Codex ${row.id.slice(0, 8)}`, createdAt: row.createdAt }
 }
@@ -287,12 +265,6 @@ export function prompts(kind, chat) {
   return { ok: true, kind, text: renderPrompt({ ...promptProfile, hasContext }, kind, promptChat) }
 }
 
-export function diskTargets() {
-  return [{
-    id, label: 'Codex 用户数据（只读）', path: path.join(os.homedir(), '.codex'), safe: false,
-    hint: '会话、配置、凭据及用户资产；未核实可重建目录，不提供清理目标。',
-  }]
-}
 
 export function menuFromRollouts(rows, now = Date.now()) {
   const latest = rows.map((row) => row.limits).filter(Boolean).sort((a, b) => b.at - a.at)[0]

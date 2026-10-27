@@ -169,6 +169,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
       DispatchQueue.main.async { self.focusCursorChat() }
       return
     }
+    if body["action"] as? String == "badge" {
+      let count = Int(self.number(body["count"]))
+      DispatchQueue.main.async {
+        NSApp.dockTile.badgeLabel = count > 0 ? (count > 99 ? "99+" : String(count)) : nil
+      }
+      return
+    }
     guard let mode = body["mode"] as? String else { return }
     DispatchQueue.main.async { self.applyMode(mode) }
   }

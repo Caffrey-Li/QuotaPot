@@ -3,21 +3,15 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { openRead, openWrite } from '../sqlite.mjs'
+import * as port from './index.mjs'
 import {
   balanceMenu,
   capabilities,
-  chats,
   discoverAt,
-  diskTargets,
-  headersFromDb,
-  modelsFromDb,
   normalizeBalance,
-  open,
   parseCredentialRefs,
-  paste,
   promptProfile,
   prompts,
-  spawn,
   usageFromDb,
 } from './index.mjs'
 
@@ -72,18 +66,8 @@ assert(week.sessions.length === 2, '7-day sessions drifted')
 const month = usageFromDb(file, 30, now)
 assert(month.days === 30 && month.tokens === 315, '30-day range drifted')
 
-const modelData = modelsFromDb(file)
-assert(modelData.ok && modelData.models.length === 2, 'model list drifted')
-assert(modelData.models[0].name === 'deepseek-flash' && modelData.models[0].tokens === 1300, 'model totals drifted')
-assert(modelData.models.every((item) => item.statusText === '无状态' && item.speed == null), 'model status or speed invented')
-assert(!JSON.stringify(modelData).includes('apiKey'), 'model output leaked a key field')
-
-const headerData = headersFromDb(file)
-assert(headerData.ok && headerData.chats.length === 3, 'headers drifted')
-assert(headerData.chats[0].name === '示例 Bot' && headerData.chats[0].createdAt === now - 2 * 3_600_000, 'header order drifted')
-
-assert(chats().degraded && chats().reason.includes('上下文'), 'chats should degrade without context')
-assert(capabilities.chats === false, 'chats capability should be false')
+assert(capabilities.usage && capabilities.quota && !capabilities.chats && !capabilities.modelStatus, 'DS Bot sections drifted')
+for (const gone of ['models', 'chats', 'headers', 'paste', 'open', 'spawn', 'diskTargets', 'peekContext']) assert(!(gone in port), gone + ' should not be exported')
 assert(promptProfile.instructionsFile === 'AGENTS.md' && promptProfile.hasContext === false, 'prompt profile drifted')
 assert(promptProfile.compactCommand === '' && promptProfile.warnPercent === 80, 'prompt compact/threshold drifted')
 
@@ -109,15 +93,7 @@ const refs = read('credentials.yaml')
 assert(parseCredentialRefs(refs, 'DEEPSEEK_API_KEY') === 'sk-demo-only-not-real', 'credential ref parse drifted')
 assert(!JSON.stringify({ menu }).includes('sk-demo-only-not-real'), 'menu leaked the key')
 
-const disks = diskTargets()
-assert(disks.find((item) => item?.id === 'dsh')?.safe === false, 'DSH data was marked safe')
-assert(disks.find((item) => item?.id === 'dsh-cache')?.safe === true, 'DSH cache was not marked safe')
-assert(disks.every((item) => item.path.startsWith(disks.find((entry) => entry.id === 'dsh').path)), 'disk target escaped DSH home')
-
 assert(capabilities.actions.open === false && capabilities.actions.paste === false && capabilities.actions.spawn === false, 'actions capability drifted')
-assert((await open({ chatId: 'session-demo-a' })).ok === false, 'open should degrade')
-assert((await spawn({ text: 'demo' })).ok === false, 'spawn should degrade')
-assert((await paste({ text: '' })).copied === false, 'empty paste should not copy')
 
 const reading = openRead(file)
 let rejected = false

@@ -1,5 +1,7 @@
 # QuotaPot · Codex 端口
 
+> 2026-10-26 精简：去掉了模型列表和 `diskTargets()`（磁盘目录统一在 `disk.mjs`）。能力为 `{ usage, chats, quota, actions: { paste: 'copy' } }`；5 小时 / 7 天窗口现在显示在用量页顶部的额度条里。下文的槽位表保留作开发记录。
+
 端口 id：`codex`。只新增本目录；没有修改注册表、Cursor、共享界面或主程序，也没有提交 commit。
 
 ## 数据源与边界

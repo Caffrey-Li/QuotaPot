@@ -17,15 +17,14 @@ export const name = 'WorkBuddy'
 // WorkBuddy keeps everything local in ~/.workbuddy/workbuddy.db. There is no
 // local plan/quota file, and the only local control channel (the eval proxy on
 // 127.0.0.1) can open a conversation but cannot write into the input box.
+// Usage is in credits. The context ratio is real, open uses workbuddy://chat/<id>,
+// and prompts can only be copied (nothing writes the input box or starts a chat with text).
 export const capabilities = {
-  discover: true,
   usage: true,
-  models: true,
   chats: true,
-  prompts: true,
-  disk: true,
-  menu: false,
-  actions: { open: true, paste: false, spawn: false },
+  quota: false,
+  modelStatus: false,
+  actions: { open: process.platform === 'darwin', paste: 'copy', spawn: false },
 }
 
 // WorkBuddy reads project instructions from CODEBUDDY.md first
@@ -232,56 +231,6 @@ export async function usage(days = 1, onProgress = () => {}) {
   return result
 }
 
-function creditAmount(value) {
-  const number = round2(value)
-  return Number.isInteger(number) ? String(number) : number.toFixed(2)
-}
-
-export function modelsFromRows(rows, sessions) {
-  const credits = new Map(creditsByModel(rows, sessions, 0).map((item) => [item.model, item]))
-  const seen = new Map()
-  for (const session of Array.isArray(sessions) ? sessions : []) {
-    const model = String(session.model || '').trim()
-    if (!model) continue
-    const bucket = seen.get(model) || { model, sessions: 0, lastAt: 0 }
-    bucket.sessions += 1
-    if (Number(session.updatedAt) > bucket.lastAt) bucket.lastAt = Number(session.updatedAt)
-    seen.set(model, bucket)
-  }
-  if (!seen.size && !credits.size) return degrade('workbuddy.db 里没有记录模型')
-  const list = [...seen.values()].sort((a, b) => {
-    const left = credits.get(a.model)?.credits || 0
-    const right = credits.get(b.model)?.credits || 0
-    return right - left || b.sessions - a.sessions || a.model.localeCompare(b.model, 'zh')
-  })
-  return {
-    ok: true,
-    headline: list.length
-      ? '本机记录到 ' + list.length + ' 个模型，下面是它们在本地会话里消耗的 credits。'
-      : '本机没有记录到模型。',
-    note: 'WorkBuddy 的 credit_json 以请求 ID 为键，不是模型名，所以 credits 是按会话最后一次使用的模型归集的；中途换模型会算到最后一个模型上。本地没有每次生成的耗时，所以显示无耗时。',
-    models: list.map((item) => {
-      const spent = credits.get(item.model)
-      const last = item.lastAt ? new Date(item.lastAt).toLocaleDateString('zh-CN') : '时间未知'
-      return {
-        name: item.model,
-        vendor: '',
-        status: 0,
-        statusText: '本地记录',
-        detail: item.sessions + ' 个会话 · 最近 ' + last
-          + (spent ? ' · 归集 ' + creditAmount(spent.credits) + ' credits' : ' · 本机没有 credits 记录'),
-        speed: null,
-      }
-    }),
-  }
-}
-
-export function models() {
-  const found = discover()
-  if (!found.installed) return found
-  return modelsFromRows(readUsageRows(), readSessionRows())
-}
-
 function chatName(session) {
   const raw = String(session?.customTitle || '').trim() || String(session?.title || '').trim()
   return raw.replace(/\s+/g, ' ').slice(0, 80) || '未命名对话'
@@ -394,21 +343,6 @@ export async function paste({ text } = {}) {
   return { ok: false, copied: true, degraded: true, reason, error: reason }
 }
 
-export async function spawn({ text, workspace } = {}) {
-  const value = String(text || '').trim()
-  let copied = false
-  if (value) {
-    try {
-      await copyToClipboard(value.slice(0, 8000))
-      copied = true
-    } catch { /* clipboard is best effort */ }
-  }
-  const reason = 'WorkBuddy 没有带提示词开新对话的 URL scheme 或命令行。本地接口只能创建空会话，'
-    + '而 /chat/<会话> 会立刻执行一轮并消耗额度，所以不开新对话。'
-    + (copied ? '继承提示词已复制到剪贴板，可以手动开新对话粘贴。' : '')
-  return { ok: false, spawned: false, copied, degraded: true, reason, error: reason }
-}
-
 export function workbuddyChatUrl(chatId) {
   return `workbuddy://chat/${encodeURIComponent(String(chatId || ''))}`
 }
@@ -425,28 +359,10 @@ export async function open({ chatId, phase = 'arm' } = {}) {
   return { ok: true, ticket: 1 }
 }
 
-export function menu() {
-  return degrade('WorkBuddy 的套餐额度在服务端，本地 workbuddy.db 里没有剩余额度记录')
-}
-
 export function peekUsage(days) {
   return snapshot().workbuddy?.usage?.[String(Number(days) || 1)] || null
 }
 
 export function peekContext() {
   return snapshot().workbuddy?.context || null
-}
-
-export function diskTargets() {
-  const home = os.homedir()
-  const base = path.join(home, 'Library', 'Application Support', 'WorkBuddy')
-  return [
-    { id: 'workbuddy', label: 'WorkBuddy', path: path.join(home, '.workbuddy'), safe: false, hint: 'workbuddy.db、会话、设置、技能' },
-    { id: 'workbuddy-gpucache', label: 'WorkBuddy GPUCache', path: path.join(base, 'GPUCache'), safe: true, hint: 'GPU 缓存' },
-    { id: 'workbuddy-dawngraphite', label: 'WorkBuddy DawnGraphiteCache', path: path.join(base, 'DawnGraphiteCache'), safe: true, hint: '图形缓存' },
-    { id: 'workbuddy-dawnwebgpu', label: 'WorkBuddy DawnWebGPUCache', path: path.join(base, 'DawnWebGPUCache'), safe: true, hint: 'WebGPU 缓存' },
-    { id: 'workbuddy-cache', label: 'WorkBuddy Cache', path: path.join(base, 'Cache'), safe: true, hint: '磁盘缓存' },
-    { id: 'workbuddy-codecache', label: 'WorkBuddy Code Cache', path: path.join(base, 'Code Cache'), safe: true, hint: '代码缓存' },
-    { id: 'workbuddy-logs', label: 'WorkBuddy logs', path: path.join(base, 'logs'), safe: true, hint: '日志' },
-  ]
 }

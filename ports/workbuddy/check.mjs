@@ -4,6 +4,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { renderPrompt } from '../prompts.mjs'
 import { openRead, openWrite } from '../sqlite.mjs'
+import * as port from './index.mjs'
 import {
   aggregateCredits,
   capabilities,
@@ -11,9 +12,7 @@ import {
   creditsByModel,
   dayStart,
   discoverFrom,
-  diskTargets,
   hasCredits,
-  modelsFromRows,
   open,
   parseCredits,
   promptProfile,
@@ -108,17 +107,6 @@ assert(oneDay.days === 1 && oneDay.unit === 'credits', 'one day usage drifted')
 const start = dayStart(1, now)
 assert(start <= now && start > now - 2 * 86_400_000, 'day start drifted')
 
-// 3. models: local record only, no speed, no secrets
-const models = modelsFromRows(rows, sessions)
-assert(models.ok && models.models.length === 3, 'model list drifted')
-assert(models.models[0].name === 'glm-5.2' && models.models[0].statusText === '本地记录', 'model status drifted')
-assert(models.models.every((item) => item.speed == null), 'a model invented a speed')
-assert(models.models[0].detail.includes('30 credits'), 'model detail drifted')
-assert(models.models[2].detail.includes('2 个会话'), 'session count drifted')
-assert(models.note.includes('请求 ID'), 'model note must explain the attribution')
-assert(!JSON.stringify(models).includes('apiKey'), 'models leaked a key field')
-assert(modelsFromRows([], []).degraded === true, 'empty model input did not degrade')
-
 // 4. chats: real context percent, compression never measured
 const chats = chatsFromRows(rows, sessions)
 assert(chats.length === 4, 'chat list drifted')
@@ -152,19 +140,13 @@ assert(!quiet.includes('上下文大约已用'), 'missing context still rendered
 assert(prompts('other', chat).degraded === true, 'unknown prompt kind did not degrade')
 
 // 6. capabilities and actions
-assert(capabilities.discover && capabilities.usage && capabilities.chats && capabilities.prompts && capabilities.disk, 'core capabilities drifted')
-assert(capabilities.menu === false, 'menu is not readable locally')
-assert(capabilities.actions.open === true && capabilities.actions.paste === false && capabilities.actions.spawn === false, 'actions drifted')
+assert(capabilities.usage && capabilities.chats && !capabilities.quota && !capabilities.modelStatus, 'WorkBuddy sections drifted')
+assert(capabilities.actions.open === (process.platform === 'darwin') && capabilities.actions.paste === 'copy' && capabilities.actions.spawn === false, 'actions drifted')
+for (const gone of ['models', 'menu', 'spawn', 'diskTargets']) assert(!(gone in port), gone + ' should not be exported')
 assert(workbuddyChatUrl('11111111-1111-4111-8111-111111111111') === 'workbuddy://chat/11111111-1111-4111-8111-111111111111', 'chat url drifted')
 const rejected = await open({ chatId: 'nope' })
 assert(rejected.ok === false && rejected.error === '对话编号无效', 'bad chat id was accepted')
 assert((await open({ phase: 'done' })).ok === true, 'open done phase drifted')
-
-// 7. disk targets
-const disks = diskTargets()
-assert(disks.find((item) => item.id === 'workbuddy')?.safe === false, 'workbuddy data was marked safe')
-assert(disks.find((item) => item.id === 'workbuddy-cache')?.safe === true, 'cache was marked read-only')
-assert(disks.every((item) => path.isAbsolute(item.path)), 'disk paths must be absolute')
 
 // 8. safety: read-only opens, no shelling out, no secrets
 const source = fs.readFileSync(path.join(root, 'index.mjs'), 'utf8')

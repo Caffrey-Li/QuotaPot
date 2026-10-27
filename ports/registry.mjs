@@ -3,9 +3,8 @@ import * as claude from './claude/index.mjs'
 import * as codex from './codex/index.mjs'
 import * as dsh from './dsh/index.mjs'
 import * as workbuddy from './workbuddy/index.mjs'
-import * as grok from './grok/index.mjs'
 
-export const ports = [cursor, claude, codex, dsh, workbuddy, grok]
+export const ports = [cursor, claude, codex, dsh, workbuddy]
 
 export function describe(port) {
   const found = port.discover()

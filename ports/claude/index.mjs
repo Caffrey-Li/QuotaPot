@@ -17,23 +17,18 @@ const DEFAULT_WINDOW = 200_000
 const LARGE_WINDOW = 1_000_000
 const RECENT_SESSIONS = 60
 const HOT_LIMIT = 12
-const DESKTOP_ONLY = 'Claude 桌面版的聊天用量不在本地。装了 Claude Code 后这里才有数据。'
 
 export const id = 'claude'
-export const name = 'Claude'
+export const name = 'Claude Code'
 
-// open / spawn are implemented below, but the current UI would run Cursor's
-// focus bridge on row click and needs placed:true before spawning. Keep them
-// off until CONTRACT-REQUESTS.md is resolved.
+// Claude Code has no way to fill its input box from outside, so prompts are copied.
+// open / spawn (Terminal) are implemented below but untested on a real Mac; keep them off.
 export const capabilities = {
-  discover: true,
   usage: true,
-  models: true,
   chats: true,
-  prompts: true,
-  disk: true,
-  menu: false,
-  actions: { open: false, paste: false, spawn: false },
+  quota: false,
+  modelStatus: false,
+  actions: { open: false, paste: 'copy', spawn: false },
 }
 
 export const promptProfile = {
@@ -52,9 +47,6 @@ export function paths(home = os.homedir(), env = process.env) {
     home,
     claudeDir,
     projectsDir: path.join(claudeDir, 'projects'),
-    apps: ['/Applications/Claude.app', path.join(home, 'Applications', 'Claude.app')],
-    support: path.join(home, 'Library', 'Application Support', 'Claude'),
-    caches: path.join(home, 'Library', 'Caches', 'com.anthropic.claudefordesktop'),
   }
 }
 
@@ -67,9 +59,7 @@ function isDir(target) {
 }
 
 export function discoverAt(where) {
-  const code = isDir(where.projectsDir)
-  const app = where.apps.find(isDir) || ''
-  return { code, desktop: Boolean(app), app }
+  return { code: isDir(where.projectsDir) }
 }
 
 function tilde(target, home = os.homedir()) {
@@ -80,31 +70,12 @@ function tilde(target, home = os.homedir()) {
 export function discover() {
   const where = paths()
   const found = discoverAt(where)
-  if (!found.code && !found.desktop) return { ...degrade('没有安装 Claude Code 或 Claude 桌面版'), installed: false }
-  const sources = []
-  if (found.code) sources.push('claude-code')
-  if (found.desktop) sources.push('claude-desktop')
-  return { ok: true, installed: true, home: tilde(found.code ? where.claudeDir : found.app), sources }
+  if (!found.code) return { ...degrade('没有安装 Claude Code'), installed: false }
+  return { ok: true, installed: true, home: tilde(where.claudeDir) }
 }
 
 function needCode() {
-  const found = discoverAt(paths())
-  if (found.code) return null
-  if (found.desktop) return degrade(DESKTOP_ONLY)
-  return { ...degrade('没有安装 Claude Code 或 Claude 桌面版'), installed: false }
-}
-
-export function diskTargets() {
-  const where = paths()
-  return [
-    { id: 'claude-home', label: 'Claude Code', path: where.claudeDir, safe: false, hint: '会话记录、设置、技能和插件' },
-    { id: 'claude', label: 'Claude 桌面版', path: where.support, safe: false, hint: '桌面版设置和本地数据' },
-    { id: 'claude-cache', label: 'Claude Cache', path: path.join(where.support, 'Cache'), safe: true },
-    { id: 'claude-codecache', label: 'Claude Code Cache', path: path.join(where.support, 'Code Cache'), safe: true },
-    { id: 'claude-gpu', label: 'Claude GPUCache', path: path.join(where.support, 'GPUCache'), safe: true },
-    { id: 'claude-dawn', label: 'Claude DawnGraphiteCache', path: path.join(where.support, 'DawnGraphiteCache'), safe: true },
-    { id: 'claude-updates', label: 'Claude 更新缓存', path: where.caches, safe: true, hint: '更新下载，会重新下载' },
-  ]
+  return discoverAt(paths()).code ? null : { ...degrade('没有安装 Claude Code'), installed: false }
 }
 
 // ---------- jsonl reading ----------
@@ -316,51 +287,6 @@ export async function usage(days = 1, onProgress = () => {}) {
   saved.usage[String(span)] = result
   persistSnapshot()
   return result
-}
-
-// ---------- models ----------
-
-export function modelsFromUsage(result, days) {
-  const rows = (result && result.models) || []
-  if (!rows.length) return degrade('最近 ' + days + ' 天的 Claude Code 会话里没有用到模型')
-  return {
-    ok: true,
-    external: false,
-    headline: '本机 Claude Code 最近 ' + days + ' 天用过的模型。',
-    note: '本地日志只记录用过哪个模型和多少 token，没有模型目录和服务状态，所以状态写「无状态」。日志里没有生成耗时，速度显示为无耗时。',
-    models: rows.map((row) => ({
-      name: row.model,
-      vendor: /^claude/i.test(row.model) ? 'Anthropic' : '',
-      status: 0,
-      statusText: '无状态',
-      detail: row.calls + ' 次调用 · ' + compactNumber(row.tokens) + ' token',
-      speed: null,
-    })),
-  }
-}
-
-function compactNumber(value) {
-  const n = Number(value) || 0
-  if (n >= 1e9) return (n / 1e9).toFixed(2) + 'B'
-  if (n >= 1e6) return (n / 1e6).toFixed(2) + 'M'
-  if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K'
-  return String(n)
-}
-
-/** Synchronous: the server sends models() without awaiting. */
-export function models() {
-  const blocked = needCode()
-  if (blocked) return blocked
-  for (const days of [30, 7, 1]) {
-    const cached = peekUsage(days)
-    if (cached && cached.ok) return modelsFromUsage(cached, days)
-  }
-  try {
-    const start = rangeStart(7)
-    return modelsFromUsage(tallyFiles(listJsonl(paths().projectsDir, start), start), 7)
-  } catch {
-    return degrade('读不到 Claude Code 的会话记录')
-  }
 }
 
 // ---------- sessions ----------
@@ -597,14 +523,9 @@ export function headers() {
 
 // ---------- prompts ----------
 
-export function activeProfile(found = discoverAt(paths())) {
-  if (found.code) return promptProfile
-  return { ...promptProfile, product: 'Claude', compactCommand: '', hasContext: false }
-}
-
 export function prompts(kind, chat) {
   if (!['new', 'handoff', 'inherit', 'crash'].includes(kind)) return degrade('没有这种提示词')
-  return { ok: true, kind, text: renderPrompt(activeProfile(), kind, chat || null) }
+  return { ok: true, kind, text: renderPrompt(promptProfile, kind, chat || null) }
 }
 
 // ---------- actions ----------
@@ -753,8 +674,3 @@ export async function open({ chatId, phase } = {}) {
   return ran.ok ? { ok: true, ticket: 0 } : ran
 }
 
-// ---------- menu ----------
-
-export function menu() {
-  return degrade('Claude 没有本地额度接口。订阅额度只在 Claude 应用和 claude.ai 里显示。')
-}

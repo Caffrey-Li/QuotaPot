@@ -1,5 +1,7 @@
 # Claude 端口
 
+> 2026-10-26 精简：只保留 Claude Code 来源（桌面版本地没有用量，已去掉）；去掉了模型列表、`menu()` 和 `diskTargets()`（磁盘目录统一在 `disk.mjs`）。能力为 `{ usage, chats, actions: { paste: 'copy' } }`，整理流程是「复制整理 → 复制继承」。`CONTRACT-REQUESTS.md` 里第 2、4、5、6、7、8 条已在这次处理。下文的槽位表保留作开发记录。
+
 端口 id：`claude`。一个端口，两个来源：
 
 - `claude-code`：Claude Code 命令行（也包括桌面版里的 Code 会话），数据在 `~/.claude/projects/`。设置了 `CLAUDE_CONFIG_DIR` 时用那个目录。

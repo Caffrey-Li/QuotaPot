@@ -7,10 +7,7 @@ import { discoverAt, listJsonl, listSessionFiles, parseLine, paths, sessionMeta,
 
 const where = paths()
 const found = discoverAt(where)
-const out = { claudeCode: found.code, claudeDesktop: found.desktop, desktopApp: found.app ? found.app.replace(os.homedir(), '~') : '' }
-const exists = (target) => { try { return fs.statSync(target).isDirectory() } catch { return false } }
-out.desktopSupportDirs = exists(where.support) ? fs.readdirSync(where.support).filter((name) => exists(path.join(where.support, name))).sort() : []
-out.desktopUpdateCache = exists(where.caches)
+const out = { claudeCode: found.code }
 
 if (found.code) {
   const files = listJsonl(where.projectsDir, 0)

@@ -1,5 +1,7 @@
 # 端口：workbuddy（WorkBuddy）
 
+> 2026-10-26 精简：去掉了模型列表、`menu()`、`spawn()` 和 `diskTargets()`（磁盘目录统一在 `disk.mjs`）。能力为 `{ usage (积分), chats, actions: { open, paste: 'copy' } }`，整理流程是「复制整理 → 复制继承」，点对话条用 `workbuddy://chat/<id>` 打开。下文的槽位表保留作开发记录。
+
 只新增了 `ports/workbuddy/`，没有改 `desktop.mjs`、`ui/index.html`、`native/`、`ports/registry.mjs`、`ports/cursor/` 或其他端口目录，也没有 git commit。
 
 ## 注册表要加的那一行（交给合并的人）

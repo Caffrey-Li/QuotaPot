@@ -2,15 +2,12 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { renderPrompt } from '../prompts.mjs'
+import * as port from './index.mjs'
 import {
-  activeProfile,
   capabilities,
-  diskTargets,
   discoverAt,
   listJsonl,
   listSessionFiles,
-  menu,
-  modelsFromUsage,
   newChatCommand,
   parseLine,
   paths,
@@ -33,16 +30,11 @@ function assert(condition, message) {
   if (!condition) throw new Error('claude check: ' + message)
 }
 
-// discovery: both sources, desktop only, nothing
+// discovery: Claude Code only (the desktop app keeps no local usage, so it is not a port)
 const home = path.join(fixtures, 'home')
-const where = { ...paths(home, {}), apps: [path.join(home, 'Applications', 'Claude.app')] }
-const both = discoverAt(where)
-assert(both.code && both.desktop, 'fixture home should show Claude Code and the desktop app')
-const desktopHome = path.join(fixtures, 'desktop-only')
-const desktopOnly = discoverAt({ ...paths(desktopHome, {}), apps: [path.join(desktopHome, 'Applications', 'Claude.app')] })
-assert(!desktopOnly.code && desktopOnly.desktop, 'desktop-only fixture detected wrongly')
-const none = discoverAt({ ...paths(path.join(fixtures, 'missing'), {}), apps: [path.join(fixtures, 'missing', 'Claude.app')] })
-assert(!none.code && !none.desktop, 'missing home was detected as installed')
+const where = paths(home, {})
+assert(discoverAt(where).code, 'fixture home should show Claude Code')
+assert(!discoverAt(paths(path.join(fixtures, 'missing'), {})).code, 'missing home was detected as installed')
 assert(paths('/h', { CLAUDE_CONFIG_DIR: '/custom' }).projectsDir === '/custom/projects', 'CLAUDE_CONFIG_DIR ignored')
 
 // usage: dedupe streaming lines and replayed messages, skip synthetic, keep subagents, honour the start
@@ -60,11 +52,6 @@ assert(recent.models.some((row) => row.model.startsWith('claude-haiku') && row.t
 assert(!recent.models.some((row) => row.model.startsWith('claude-opus')), 'usage before the start was counted')
 const month = tallyFiles(files, Date.parse('2026-10-01T00:00:00.000Z'))
 assert(month.tokens === 510507 && month.calls === 8, 'usage since 10-01 drifted: ' + month.tokens + '/' + month.calls)
-
-// models: unit-free list from usage, no fake status or speed
-const listed = modelsFromUsage(recent, 7)
-assert(listed.ok && listed.models.every((row) => row.speed === null && row.statusText === '无状态'), 'models invented a status or speed')
-assert(modelsFromUsage({ models: [] }, 7).degraded, 'empty model list did not degrade')
 
 // sessions: names, project, context size, window, 80% warning input
 const sessions = listSessionFiles(where.projectsDir)
@@ -85,17 +72,14 @@ assert(trend.compactions === 1 && trend.boundaries === 1, 'compaction count drif
 assert(Math.abs(trend.lostRatio - (170210 - 20010) / 170210) < 1e-6, 'compaction loss drifted: ' + trend.lostRatio)
 assert(trend.samples === 5 && trend.maxUsed === 170210, 'context samples drifted')
 
-// prompts: CLAUDE.md, /compact, and no context line for desktop only
+// prompts: CLAUDE.md and /compact
 const chat = JSON.parse(fs.readFileSync(path.join(fixtures, 'prompts.json'), 'utf8')).chat
-const handoff = renderPrompt(activeProfile(both), 'handoff', chat)
+const handoff = port.prompts('handoff', chat).text
 assert(handoff.startsWith('请整理当前这条 Claude Code 对话'), 'handoff product drifted')
 assert(handoff.includes('上下文大约已用 84%，窗口大约 16.7万 / 20万 token。'), 'handoff context line drifted')
 assert(handoff.includes('需要压缩时可以使用 /compact。'), 'compact command missing')
-assert(renderPrompt(activeProfile(both), 'new', null).includes('1. CLAUDE.md：'), 'instructions file drifted')
-assert(renderPrompt(activeProfile(both), 'crash', null).includes('CLAUDE.md'), 'crash prompt lost CLAUDE.md')
-const desk = renderPrompt(activeProfile(desktopOnly), 'handoff', chat)
-assert(desk.startsWith('请整理当前这条 Claude 对话') && !desk.includes('上下文大约已用') && !desk.includes('/compact'), 'desktop-only prompt kept Claude Code details')
-assert(!renderPrompt(activeProfile(desktopOnly), 'inherit', chat).includes('上下文当时'), 'desktop inherit kept a context line')
+assert(renderPrompt(promptProfile, 'new', null).includes('1. CLAUDE.md：'), 'instructions file drifted')
+assert(renderPrompt(promptProfile, 'crash', null).includes('CLAUDE.md'), 'crash prompt lost CLAUDE.md')
 assert(promptProfile.instructionsFile === 'CLAUDE.md', 'profile drifted')
 
 // actions: generated Terminal commands only, nothing executed here
@@ -111,14 +95,9 @@ const args = terminalArgs(fresh)
 assert(args.at(-1) === fresh && !args.slice(0, -1).some((part) => part.includes('claude')), 'command was spliced into AppleScript')
 assert(resolveWorkspace('demo', sessions) === '/work/demo', 'workspace basename not resolved')
 assert(resolveWorkspace('nope', sessions) === '', 'unknown workspace resolved')
-assert(!capabilities.actions.paste && !capabilities.actions.open && !capabilities.actions.spawn, 'actions must stay off until the UI is port-aware')
-
-// disk and menu
-const disks = diskTargets()
-for (const id of ['claude-home', 'claude']) assert(disks.find((item) => item.id === id)?.safe === false, id + ' was marked safe')
-assert(disks.filter((item) => item.safe).every((item) => /Cache|Caches/.test(item.path)), 'a non-cache path was marked safe')
-const quota = menu()
-assert(quota.degraded && !('usedPercent' in quota), 'menu invented a quota')
+assert(capabilities.actions.paste === 'copy' && !capabilities.actions.open && !capabilities.actions.spawn, 'Claude Code actions drifted')
+assert(capabilities.usage && capabilities.chats && !capabilities.quota && !capabilities.modelStatus, 'Claude Code sections drifted')
+for (const gone of ['models', 'menu', 'diskTargets']) assert(!(gone in port), gone + ' should not be exported')
 
 // hygiene: no shelling out to sqlite3, no Cmd+V, fixtures carry no secrets or user paths
 const source = fs.readFileSync(path.join(root, 'index.mjs'), 'utf8')

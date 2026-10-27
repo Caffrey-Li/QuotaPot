@@ -1,4 +1,3 @@
-import { spawn as spawnProcess } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -14,14 +13,13 @@ const API_TIMEOUT_MS = 15_000
 export const id = 'dsh'
 export const name = 'DS Bot'
 
+// DS Bot keeps token usage and the DeepSeek balance locally, but no context window,
+// so it has no chats section and no chat actions.
 export const capabilities = {
-  discover: true,
   usage: true,
-  models: true,
   chats: false,
-  prompts: true,
-  disk: true,
-  menu: true,
+  quota: true,
+  modelStatus: false,
   actions: { open: false, paste: false, spawn: false },
 }
 
@@ -272,129 +270,10 @@ export function peekUsage(days) {
   return snapshot().dsh?.usage?.[String(span)] || null
 }
 
-export function peekContext() {
-  return snapshot().dsh?.context || null
-}
-
-export function modelsFromDb(file) {
-  if (!fs.existsSync(file)) return degrade('没有 DSH 用量数据库（~/.dsh/bot/usage.sqlite）')
-  let data
-  try {
-    data = readRows(file, 0)
-  } catch (error) {
-    return degrade('读不到 DSH 用量数据库：' + String(error?.message || error).slice(0, 120))
-  }
-  if (data.totalCount === 0) return degrade('DSH 还没有写入任何用量记录')
-  const summary = summarize(data.rows, { since: 0 })
-  if (summary.models.length === 0) return degrade('DSH 用量里还没有模型记录')
-  return {
-    ok: true,
-    headline: summary.models.length + ' 个模型',
-    note: '来自 DS Bot 本地 calls 表；没有模型状态和生成耗时。',
-    models: summary.models.map((item) => ({
-      name: item.model,
-      vendor: item.provider || 'DSH',
-      status: 0,
-      statusText: '无状态',
-      detail: 'DSH 的 calls 表没有模型状态字段',
-      speed: null,
-      tokens: item.tokens,
-      calls: item.calls,
-      lastAt: item.lastAt,
-    })),
-  }
-}
-
-export function models() {
-  const found = discover()
-  if (!found.installed) return found
-  return modelsFromDb(usageDbPath())
-}
-
-export function headersFromDb(file) {
-  if (!fs.existsSync(file)) return degrade('没有 DSH 用量数据库（~/.dsh/bot/usage.sqlite）')
-  let data
-  try {
-    data = readRows(file, 0)
-  } catch (error) {
-    return degrade('读不到 DSH 用量数据库：' + String(error?.message || error).slice(0, 120))
-  }
-  if (data.totalCount === 0) return degrade('DSH 还没有写入任何用量记录')
-  const summary = summarize(data.rows, { since: 0 })
-  return {
-    ok: true,
-    chats: summary.sessions.map((item) => ({ id: item.id, name: item.name, createdAt: item.createdAt })),
-  }
-}
-
-export function headers() {
-  const found = discover()
-  if (!found.installed) return found
-  return headersFromDb(usageDbPath())
-}
-
-export function chats() {
-  return degrade('DSH 的 calls 表没有上下文窗口和压缩记录，无法计算 80% 阈值；这条端口不显示对话比例。')
-}
-
 export function prompts(kind, chat) {
   const allowed = ['new', 'handoff', 'inherit', 'crash']
   if (!allowed.includes(kind)) return degrade('没有这种提示词')
   return { ok: true, kind, text: renderPrompt(promptProfile, kind, chat || null) }
-}
-
-function copyToClipboard(value) {
-  return new Promise((resolve, reject) => {
-    if (process.platform !== 'darwin') {
-      reject(new Error('第一版只支持 macOS'))
-      return
-    }
-    const child = spawnProcess('pbcopy')
-    const timer = setTimeout(() => {
-      child.kill()
-      reject(new Error('复制超时'))
-    }, 3000)
-    child.on('error', (error) => {
-      clearTimeout(timer)
-      reject(error)
-    })
-    child.on('close', (code) => {
-      clearTimeout(timer)
-      if (code === 0) resolve()
-      else reject(new Error('复制失败'))
-    })
-    child.stdin.end(value)
-  })
-}
-
-export async function paste({ text } = {}) {
-  const value = String(text || '').slice(0, 8000)
-  if (!value.trim()) return { ok: false, copied: false, error: '没有可复制的内容' }
-  try {
-    await copyToClipboard(value)
-    return { ok: true, copied: true, placed: false, note: '已复制。DSH 没有可写入的输入框接口，请手动粘贴。' }
-  } catch (error) {
-    return { ok: false, copied: false, error: '没能复制到剪贴板：' + String(error?.message || error).slice(0, 80) }
-  }
-}
-
-export async function open() {
-  return { ok: false, error: 'DSH 没有稳定的会话深链，已降级' }
-}
-
-export async function spawn() {
-  return { ok: false, error: 'DSH 没有带提示词开新会话的 CLI 或深链，已降级' }
-}
-
-export function diskTargets() {
-  const base = dshHome()
-  return [
-    { id: 'dsh', label: 'DSH / DS Bot data', path: base, safe: false, hint: 'sessions, bot data, workspace' },
-    { id: 'dsh-cache', label: 'DSH cache', path: path.join(base, 'cache'), safe: true },
-    { id: 'dsh-projcache', label: 'DSH session project cache', path: path.join(base, 'storages', 'session_projcache'), safe: true },
-    { id: 'dsh-logs', label: 'DSH logs', path: path.join(base, 'logs'), safe: true },
-    { id: 'dsh-attachments-tmp', label: 'DSH attachment temp', path: path.join(base, 'attachments', 'v1', 'tmp'), safe: true },
-  ]
 }
 
 export function parseCredentialRefs(text, name) {

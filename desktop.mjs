@@ -7,7 +7,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
-import { diskTargets } from './disk.mjs'
+import { diskTargets, isInside } from './disk.mjs'
 import {
   contextSave,
   contextTrend,
@@ -172,12 +172,19 @@ export async function scanDiskProgress(onProgress) {
     onProgress({ done, total: existing.length, label, etaMs })
   }
   for (const target of existing) {
-    report(target.label)
+    report(target.group + ' ' + target.label)
     const size = await directorySize(target.path)
     done += 1
-    if (size !== null) items.push({ ...target, path: homeOf(target.path), size })
-    report(target.label)
+    if (size !== null) items.push({ ...target, size })
+    report(target.group + ' ' + target.label)
   }
+  // A cache inside a data folder is shown under it; its size is already part of the parent.
+  for (const item of items) {
+    const parents = items.filter((other) => other !== item && other.group === item.group && isInside(item.path, other.path))
+    parents.sort((a, b) => b.path.length - a.path.length)
+    item.parent = parents[0]?.id || null
+  }
+  for (const item of items) item.path = homeOf(item.path)
   let free = null
   try {
     const info = await statfs(os.homedir())
@@ -200,12 +207,19 @@ export function cleanTargets(ids) {
   return { accepted, rejected }
 }
 
+/** Drop selected targets that sit inside another selected target, so nothing is deleted or counted twice. */
+export function outermostTargets(targets) {
+  return targets.filter((target) => !targets.some((other) => other !== target && isInside(target.path, other.path)))
+}
+
 export async function cleanDisk(ids) {
   const { accepted, rejected } = cleanTargets(ids)
   const cleaned = []
   const errors = rejected.map((id) => ({ id, error: 'UNKNOWN' }))
   let freed = 0
-  for (const target of accepted) {
+  const covered = accepted.filter((target) => !outermostTargets(accepted).includes(target))
+  for (const target of covered) cleaned.push(target.id)
+  for (const target of outermostTargets(accepted)) {
     const size = await directorySize(target.path) ?? 0
     try {
       await rm(target.path, { recursive: true, force: true })
@@ -415,7 +429,13 @@ async function routePort(request, response, url) {
   }
   const sub = match[2] || ''
   try {
+    const missing = (name) => {
+      if (typeof port[name] === 'function') return false
+      sendJson(response, 404, degrade('这个端口没有这项功能'))
+      return true
+    }
     if (request.method === 'GET' && sub === '/usage/stream') {
+      if (missing('usage')) return true
       const send = openSse(response)
       const cached = port.peekUsage(url.searchParams.get('days'))
       if (cached) send({ type: 'cached', usage: cached })
@@ -425,10 +445,17 @@ async function routePort(request, response, url) {
       return true
     }
     if (request.method === 'GET' && sub === '/models') {
+      if (missing('models')) return true
       sendJson(response, 200, port.models())
       return true
     }
+    if (request.method === 'GET' && sub === '/menu') {
+      if (missing('menu')) return true
+      sendJson(response, 200, await port.menu())
+      return true
+    }
     if (request.method === 'GET' && sub === '/context/stream') {
+      if (missing('chats')) return true
       const send = openSse(response)
       const cached = port.peekContext()
       if (cached) send({ type: 'cached', context: cached })
@@ -438,6 +465,7 @@ async function routePort(request, response, url) {
       return true
     }
     if (request.method === 'GET' && sub === '/headers') {
+      if (missing('headers')) return true
       sendJson(response, 200, port.headers())
       return true
     }
@@ -447,16 +475,19 @@ async function routePort(request, response, url) {
       return true
     }
     if (request.method === 'POST' && sub === '/paste') {
+      if (missing('paste')) return true
       const body = await readBody(request)
       sendJson(response, 200, await port.paste({ text: body.text, chatId: body.chatId }))
       return true
     }
     if (request.method === 'POST' && sub === '/spawn') {
+      if (missing('spawn')) return true
       const body = await readBody(request)
       sendJson(response, 200, await port.spawn(body))
       return true
     }
     if (request.method === 'POST' && sub === '/open') {
+      if (missing('open')) return true
       const body = await readBody(request)
       sendJson(response, 200, await port.open({ chatId: body.chatId, phase: body.phase, ticket: body.ticket }))
       return true
@@ -668,6 +699,12 @@ function selfCheck() {
   if (plan.accepted.map((item) => item.id).join(',') !== 'cursor,cursor-cache' || plan.rejected[0] !== '../etc') {
     throw new Error('threshold must not decide what can be cleaned')
   }
+  if (outermostTargets(plan.accepted).map((item) => item.id).join(',') !== 'cursor') {
+    throw new Error('a cache inside a selected folder would be deleted twice')
+  }
+  if (!targets.every((item) => item.group) || new Set(targets.map((item) => item.id)).size !== targets.length) {
+    throw new Error('disk targets must be grouped and unique')
+  }
   const trend = contextTrend([
     { at: 1, used: 100 },
     { at: 2, used: 180 },
@@ -690,11 +727,28 @@ function selfCheck() {
   if (modelStatus(1).statusText !== '降级' || modelStatus(2).statusText !== '停用' || modelStatus(0).detail) {
     throw new Error('model status text drifted')
   }
-  for (const label of ['用量', '模型', '对话', '空间', '工具', '阈值', '上下文消耗增幅', '整理', '一键整理', '继承对话', '一键开新', '耗时', '崩溃', '无耗时']) {
+  for (const label of ['用量', '对话', '空间', '额度', '阈值', '上下文消耗增幅', '整理', '一键整理', '继承对话', '一键开新', '复制整理', '复制继承', '耗时', '崩溃', '提示词']) {
     if (!html.includes(label)) throw new Error(`UI missing ${label}`)
   }
-  if (html.includes('data-tab="balance"') || html.includes('data-tab="agents"')) {
-    throw new Error('UI still has balance or agents tabs')
+  for (const gone of ['data-tab="balance"', 'data-tab="agents"', 'data-tab="models"', 'data-tab="tools"', '无耗时']) {
+    if (html.includes(gone)) throw new Error(`UI still has ${gone}`)
+  }
+  // Each port declares only what it can do, and exports exactly the functions those sections need.
+  for (const port of ports) {
+    const caps = port.capabilities || {}
+    const actions = caps.actions || {}
+    if (!['place', 'copy', false].includes(actions.paste)) throw new Error(`${port.id}: paste must be 'place', 'copy' or false`)
+    const need = ['discover', 'prompts']
+    if (caps.usage) need.push('usage', 'peekUsage')
+    if (caps.chats) need.push('chats', 'peekContext', 'headers')
+    if (caps.quota) need.push('menu')
+    if (caps.modelStatus) need.push('models')
+    if (actions.paste) need.push('paste')
+    if (actions.open) need.push('open')
+    if (actions.spawn) need.push('spawn')
+    for (const name of need) if (typeof port[name] !== 'function') throw new Error(`${port.id}: missing ${name}()`)
+    if (typeof port.diskTargets === 'function') throw new Error(`${port.id}: disk targets belong in disk.mjs`)
+    if (!caps.usage && !caps.chats) throw new Error(`${port.id}: a port with nothing to show should not be registered`)
   }
   if (!html.includes('quotapot.diskThresholdGB') || !html.includes('80%')) {
     throw new Error('UI drifted from the context threshold')
@@ -703,6 +757,12 @@ function selfCheck() {
   if (contextSave(0.5 * 256000) >= 100000) throw new Error('threshold is below the measured payback')
   if (html.includes('class="sea"') || html.includes('class="whale"')) {
     throw new Error('UI still has the window whale')
+  }
+  if (!html.includes('id="chat-badge"') || !html.includes('id="space-badge"') || !html.includes('const n = chats + space')) {
+    throw new Error('threshold count badge missing')
+  }
+  if (!fs.readFileSync(path.join(ROOT, 'native', 'Window.swift'), 'utf8').includes('dockTile.badgeLabel')) {
+    throw new Error('threshold count badge missing')
   }
   if (!html.includes('row-sheen') || !html.includes('/api/ports/')) {
     throw new Error('chat rows cannot open or highlight')

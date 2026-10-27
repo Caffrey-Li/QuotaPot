@@ -22,14 +22,11 @@ export const id = 'cursor'
 export const name = 'Cursor'
 
 export const capabilities = {
-  discover: true,
   usage: true,
-  models: true,
   chats: true,
-  prompts: true,
-  disk: true,
-  menu: true,
-  actions: { open: process.platform === 'darwin', paste: true, spawn: true },
+  quota: true,
+  modelStatus: true,
+  actions: { open: process.platform === 'darwin', paste: 'place', spawn: true },
 }
 
 export const promptProfile = {
@@ -64,18 +61,6 @@ export function unsealCursorSecret(stored, key) {
   const decipher = createDecipheriv('aes-256-gcm', key, nonce)
   decipher.setAuthTag(tag)
   return Buffer.concat([decipher.update(data), decipher.final()]).toString('utf8')
-}
-
-export function diskTargets() {
-  const base = cursorSupportDir()
-  return [
-    { id: 'cursor', label: 'Cursor', path: base, safe: false, hint: 'chats, settings, snapshots' },
-    { id: 'cursor-cacheddata', label: 'Cursor CachedData', path: path.join(base, 'CachedData'), safe: true },
-    { id: 'cursor-cache', label: 'Cursor Cache', path: path.join(base, 'Cache'), safe: true },
-    { id: 'cursor-codecache', label: 'Cursor Code Cache', path: path.join(base, 'Code Cache'), safe: true },
-    { id: 'cursor-gpucache', label: 'Cursor GPUCache', path: path.join(base, 'GPUCache'), safe: true },
-    { id: 'cursor-logs', label: 'Cursor logs', path: path.join(base, 'logs'), safe: true },
-  ]
 }
 
 export function cursorDbPath() {
@@ -410,14 +395,13 @@ export function modelsFromCatalog(user) {
       status: status.status,
       statusText: status.statusText,
       detail: status.detail || explainModelError(warning),
-      speed: null,
     })
   }
   for (const item of ownModels) {
     const modelName = typeof item === 'string' ? item : String(item.name || item.model || '')
     if (!modelName || seen.has(modelName)) continue
     seen.add(modelName)
-    models.push({ name: modelName, vendor: '外部', status: 0, statusText: '正常', detail: '外部 · 用你自己的密钥调用', speed: null })
+    models.push({ name: modelName, vendor: '外部', status: 0, statusText: '正常', detail: '外部 · 用你自己的密钥调用' })
   }
   models.sort((a, b) => b.status - a.status || a.name.localeCompare(b.name, 'zh'))
   return {
@@ -426,7 +410,7 @@ export function modelsFromCatalog(user) {
     headline: external
       ? '已接入外部模型（' + providers.join('、') + '）。下面是全部模型。'
       : '未接入外部模型。下面是 Cursor 目录里的全部模型。',
-    note: '速度要有每次生成的耗时才能换成 tokens/s。Cursor 没有返回这个数，所以显示为无耗时。报错会写成中文说明。',
+    note: '只提示降级和停用的模型。报错会写成中文说明。',
     models,
   }
 }

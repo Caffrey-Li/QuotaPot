@@ -18,11 +18,11 @@ const duplicate = fixture('duplicate')
 const reset = fixture('reset')
 const compacted = fixture('compacted')
 
-for (const key of ['discover', 'usage', 'models', 'chats', 'headers', 'prompts', 'paste', 'spawn', 'open', 'diskTargets', 'menu', 'peekUsage', 'peekContext']) assert.equal(typeof port[key], 'function', key)
+for (const key of ['discover', 'usage', 'chats', 'headers', 'prompts', 'paste', 'spawn', 'open', 'menu', 'peekUsage', 'peekContext']) assert.equal(typeof port[key], 'function', key)
+for (const key of ['models', 'diskTargets']) assert.equal(port[key], undefined, key + ' should not be exported')
 assert.equal(port.id, 'codex')
 assert.equal(port.name, 'Codex')
-for (const key of ['discover', 'usage', 'models', 'chats', 'prompts', 'disk', 'menu']) assert.equal(port.capabilities[key], true)
-assert.deepEqual(port.capabilities.actions, { open: false, paste: false, spawn: false })
+assert.deepEqual(port.capabilities, { usage: true, chats: true, quota: true, modelStatus: false, actions: { open: false, paste: 'copy', spawn: false } })
 assert.equal(port.peekUsage(1), null)
 assert.equal(port.peekContext(), null)
 
@@ -77,9 +77,6 @@ const changed = fixtureText('cumulative').trim().split('\n').map(JSON.parse)
 changed.splice(changed.length - 1, 0, { type: 'turn_context', timestamp: changed.at(-1).timestamp, payload: { model: 'fixture-second-model' } })
 const changedModels = port.usageFromRollouts([port.parseRollout(changed.map(JSON.stringify).join('\n'))], 1, localEnd(2026, 8, 27)).models
 assert.equal(changedModels.find((item) => item.model === 'fixture-second-model').tokens, 39314)
-const modelList = port.modelsFromRollouts([cumulative, modern])
-assert(modelList.models.every((item) => item.speed === null && item.statusText === '未核实' && item.tokens > 0 && item.unit === 'token'))
-assert(port.modelsFromRollouts([unmetered]).degraded)
 
 const chats = port.chatsFromRollouts([cumulative, unmetered, compacted])
 assert.equal(chats.warnPercent, 80)
@@ -162,7 +159,6 @@ assert(!generated.ok && generated.command === spawning.command && !generated.spa
 assert(!(await port.open({ chatId: 'invalid' })).ok)
 assert(!(await port.open({ phase: 'done' })).ok)
 assert(!(await port.paste({ text: '' })).copied)
-assert(port.diskTargets().every((item) => item.safe === false))
 
 // Import and missing-product behavior in a fresh HOME; no real product data or UI actions used.
 const home = fs.mkdtempSync(path.join(os.tmpdir(), 'quotapot-codex-check-'))
@@ -174,11 +170,18 @@ try {
       if (String(file).endsWith('.mjs')) return openSync(file, ...args);
       throw Error('import opened product data');
     };
-    for (const key of ['readFileSync', 'readdirSync', 'createReadStream', 'existsSync', 'statSync']) fs.default[key] = () => { throw Error('import performed IO') };
+    // The ESM loader itself may read module files with readFileSync on some Node versions; only product data is forbidden.
+    for (const key of ['readFileSync', 'readdirSync', 'createReadStream', 'existsSync', 'statSync']) {
+      const original = fs.default[key];
+      fs.default[key] = (file, ...args) => {
+        if (key === 'readFileSync' && /\.(mjs|js|json)$/.test(String(file?.pathname ?? file))) return original(file, ...args);
+        throw Error('import performed IO');
+      };
+    }
     const port = await import(${JSON.stringify(new URL('./index.mjs', import.meta.url).href)});
     fs.default.existsSync = () => false;
-    if (port.models()?.then || port.headers()?.then) throw Error('synchronous route returned a Promise');
-    for (const read of [() => port.discover(), () => port.usage(1), () => port.models(), () => port.chats(), () => port.headers(), () => port.menu()]) {
+    if (port.headers()?.then) throw Error('synchronous route returned a Promise');
+    for (const read of [() => port.discover(), () => port.usage(1), () => port.chats(), () => port.headers(), () => port.menu()]) {
       const result = await read();
       if (!result.degraded || result.ok || !result.reason) throw Error('missing installation did not degrade');
     }
@@ -192,10 +195,8 @@ try {
     Object.defineProperty(process, 'platform', { value: 'darwin' });
     const port = await import(${JSON.stringify(new URL('./index.mjs', import.meta.url).href)});
     assert(port.discover().installed);
-    const models = port.models();
     const headers = port.headers();
-    assert(!models.then && !headers.then);
-    assert.equal(models.models.length, 2);
+    assert(!headers.then);
     assert.equal(headers.chats.length, 3);
     const progress = [];
     const usage = await port.usage(30, event => progress.push(event));

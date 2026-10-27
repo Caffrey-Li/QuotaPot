@@ -8,7 +8,6 @@ import { openRead, openWrite } from '../sqlite.mjs'
 import {
   aggregateUsage,
   capabilities,
-  diskTargets,
   modelStatus,
   modelsFromCatalog,
   parseComposerLine,
@@ -32,7 +31,7 @@ assert(totals.models[0].model === 'demo-a', 'usage fixture kept the early event'
 
 const catalog = modelsFromCatalog(fixture('model-catalog.json'))
 assert(catalog.ok && catalog.models[0].statusText === '降级', 'degraded model not sorted first')
-assert(catalog.models.every((item) => item.speed == null), 'catalog invented a speed')
+assert(catalog.models.every((item) => !('speed' in item)), 'catalog still carries a speed field')
 assert(catalog.models.some((item) => item.detail.includes('密钥无效')), 'error hint drifted')
 assert(!JSON.stringify(catalog).includes('apiKey'), 'catalog leaked a key field')
 
@@ -62,11 +61,9 @@ assert(!quiet.includes('上下文大约已用'), 'missing context still rendered
 assert(quiet.includes('需要压缩时可以使用 /compact。'), 'compact command was dropped')
 
 assert(modelStatus(1).statusText === '降级' && modelStatus(2).statusText === '停用' && modelStatus(0).detail === '', 'model status drifted')
-assert(capabilities.actions.paste && capabilities.actions.spawn, 'cursor capabilities drifted')
+assert(capabilities.actions.paste === 'place' && capabilities.actions.spawn, 'cursor capabilities drifted')
+assert(capabilities.usage && capabilities.chats && capabilities.quota && capabilities.modelStatus, 'cursor sections drifted')
 assert(capabilities.actions.open === (process.platform === 'darwin'), 'cursor open should follow the platform')
-const disks = diskTargets()
-assert(disks.find((item) => item.id === 'cursor')?.safe === false, 'cursor data was marked safe')
-assert(disks.find((item) => item.id === 'cursor-cache')?.safe === true, 'cursor cache was marked read-only')
 const sealKey = randomBytes(32)
 const nonce = randomBytes(12)
 const cipher = createCipheriv('aes-256-gcm', sealKey, nonce)
