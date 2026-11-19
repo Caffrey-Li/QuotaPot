@@ -1357,13 +1357,37 @@
     }
     selectPort(portList.find((item) => item.id === saved) || portList[0])
   }
-  async function checkUpdate() {
+  const dshPanel = window.QUOTAPOT_DSH === true
+  if (dshPanel) {
+    const button = document.createElement('button')
+    button.type = 'button'
+    button.textContent = '检查更新'
+    button.addEventListener('click', async () => {
+      button.disabled = true
+      try { await checkUpdate(true) } finally { button.disabled = false }
+    })
+    $('frame-toggle').replaceChildren(button)
+    $('update-go').textContent = '立即更新'
+  }
+  async function checkUpdate(manual = false) {
     try {
       const info = await fetch('/api/update', { cache: 'no-store' }).then((response) => response.json())
-      if (!info.newer) return
-      $('update-text').textContent = `有新版本 v${info.latest}（当前 v${info.current}）`
+      if (!info.newer && !manual) return
+      $('update-text').textContent = info.newer
+        ? `有新版本 v${info.latest}（当前 v${info.current}）`
+        : info.ok ? `已是最新版本 v${info.current}` : info.error
+      $('update-go').hidden = !info.newer
+      if (dshPanel) {
+        $('update-go').disabled = false
+        $('update-go').textContent = '立即更新'
+      }
       $('update').hidden = false
-    } catch { /* offline: no banner */ }
+    } catch {
+      if (!manual) return
+      $('update-text').textContent = '检查更新失败'
+      $('update-go').hidden = true
+      $('update').hidden = false
+    }
   }
   $('update-go').addEventListener('click', async () => {
     const button = $('update-go')
@@ -1378,6 +1402,12 @@
     }
     if (result.ok) {
       button.hidden = true
+      if (dshPanel) {
+        $('update-text').textContent = result.upToDate ? `已是最新版本 v${result.version}`
+          : result.restartRequired ? `已安装 v${result.version}，请重启 DSH 生效`
+          : `已更新到 v${result.version}`
+        return
+      }
       $('update-text').textContent = result.rebuilt
         ? `已更新到 v${result.version}，正在重启。重启后请到「系统设置 → 隐私与安全性 → 辅助功能」重新打开 QuotaPot`
         : `已更新到 v${result.version}，正在重启…`
@@ -1387,7 +1417,7 @@
     button.disabled = false
     button.textContent = '重试'
   })
-  checkUpdate()
+  if (!dshPanel) checkUpdate()
   loadPorts().then(() => {
     show(visibleTabs()[0])
     ensureContext()

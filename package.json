@@ -1,0 +1,40 @@
+{
+  "name": "dsh-quotapot",
+  "version": "0.6.0",
+  "description": "QuotaPot 对话上下文、用量、额度与空间面板",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dsh/index.mjs",
+  "exports": {
+    ".": "./dsh/index.mjs",
+    "./client": "./dsh/client.js"
+  },
+  "engines": {
+    "node": ">=22.13.0",
+    "dsh": ">=0.2.1-rc.5 <0.4.0"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./dsh/cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true
+    }
+  },
+  "scripts": {
+    "pack:dsh": "node dsh/pack.mjs"
+  },
+  "files": [
+    "desktop.mjs",
+    "disk.mjs",
+    "ui/index.html",
+    "ports/**/*.mjs",
+    "!ports/**/check.mjs",
+    "!ports/**/probe.mjs",
+    "dsh/index.mjs",
+    "dsh/update.mjs",
+    "dsh/client.js",
+    "dsh/cordis.patch.yml"
+  ]
+}

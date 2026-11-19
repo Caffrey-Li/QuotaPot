@@ -415,11 +415,11 @@ function openSse(response) {
   return (event) => response.write(`data: ${JSON.stringify(event)}\n\n`)
 }
 
-async function routePort(request, response, url) {
+async function routePort(request, response, url, describePorts) {
   const match = url.pathname.match(/^\/api\/ports(?:\/([a-z0-9-]+))?(\/.*)?$/)
   if (!match) return false
   if (!match[1]) {
-    sendJson(response, 200, { ok: true, ports: installedPorts() })
+    sendJson(response, 200, { ok: true, ports: describePorts() })
     return true
   }
   const port = getPort(match[1])
@@ -500,16 +500,20 @@ async function routePort(request, response, url) {
   return false
 }
 
-function serve() {
+export function createRequestHandler({
+  checkForUpdate = checkUpdate,
+  applyUpdate = installUpdate,
+  describePorts = installedPorts,
+} = {}) {
   const html = fs.readFileSync(UI)
-  const server = http.createServer(async (request, response) => {
+  return async (request, response) => {
     const url = new URL(request.url || '/', `http://${HOST}:${PORT}`)
     if (request.method === 'GET' && (url.pathname === '/' || url.pathname === '/index.html')) {
       response.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' })
       response.end(html)
       return
     }
-    if (await routePort(request, response, url)) return
+    if (await routePort(request, response, url, describePorts)) return
     if (request.method === 'GET' && url.pathname === '/api/status') {
       try {
         sendJson(response, 200, await collectStatus())
@@ -519,11 +523,11 @@ function serve() {
       return
     }
     if (request.method === 'GET' && url.pathname === '/api/update') {
-      sendJson(response, 200, await checkUpdate({ fresh: url.searchParams.get('fresh') === '1' }))
+      sendJson(response, 200, await checkForUpdate({ fresh: url.searchParams.get('fresh') === '1' }))
       return
     }
     if (request.method === 'POST' && url.pathname === '/api/update/install') {
-      sendJson(response, 200, await installUpdate())
+      sendJson(response, 200, await applyUpdate())
       return
     }
     if (request.method === 'GET' && url.pathname === '/api/disk/stream') {
@@ -556,7 +560,11 @@ function serve() {
     }
     response.writeHead(404)
     response.end()
-  })
+  }
+}
+
+function serve() {
+  const server = http.createServer(createRequestHandler())
   server.listen(PORT, HOST, () => {
     process.stdout.write(`QUOTAPOT_LISTEN ${HOST}:${PORT}\n`)
     if (process.platform === 'win32' && !process.env.QUOTAPOT_NO_WINDOW) openDesktopWindow()
@@ -776,7 +784,10 @@ function selfCheck() {
 }
 
 const args = process.argv.slice(2)
-const isMain = process.argv[1] && fs.realpathSync(process.argv[1]) === fs.realpathSync(fileURLToPath(import.meta.url))
+let isMain = false
+try {
+  isMain = !!process.argv[1] && fs.realpathSync(process.argv[1]) === fs.realpathSync(fileURLToPath(import.meta.url))
+} catch { /* DSH can import this module from a worker without a script filename. */ }
 if (isMain && args.includes('--check')) selfCheck()
 else if (isMain && args.includes('--build')) install()
 else if (isMain && args.includes('--install')) {

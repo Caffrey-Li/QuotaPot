@@ -4,6 +4,22 @@
 
 <p align="center"><img src="docs/expanded.png" width="760" alt="QuotaPot 展开窗口：按模型查看 Cursor 今日 token 用量"></p>
 
+## DeepSeek Harness 插件
+
+在 DSH 侧栏点击 **QuotaPot** 可打开对话、用量和空间面板。用量端口继续使用 QuotaPot 原有的数据源。DS Bot 的 token 统计来自 `DSH_HOME/bot/usage.sqlite`（默认 `~/.dsh/bot/usage.sqlite`）。DeepSeek API 余额需要可用的 API Key。插件使用 DSH 自带运行时和插件管理器。
+
+### 安装
+
+- **Windows** 解压 [dsh-quotapot-0.6.0.zip](https://github.com/Caffrey-Li/QuotaPot/releases/download/dsh-v0.6.0/dsh-quotapot-0.6.0.zip) 到固定目录。在 DSH 的「设置 → 插件 → 新增插件」选择解压后的 `dsh-quotapot-0.6.0` 文件夹。
+- **macOS** 在同一入口选择 [dsh-quotapot-0.6.0.tgz](https://github.com/Caffrey-Li/QuotaPot/releases/download/dsh-v0.6.0/dsh-quotapot-0.6.0.tgz)，也可以选择解压后的文件夹。
+- **固定地址** 在「新增插件」粘贴 `https://caffrey-li.github.io/QuotaPot/dsh/latest.tgz`。DSH 提示重启时，重启后再打开侧栏面板。
+
+### 更新
+
+打开侧栏的 QuotaPot，点击「检查更新」。出现新版本提示后点击「立即更新」，由 DSH 插件管理器安装。面板会提示是否需要重启 DSH。更新渠道使用 `latest.json` 检查版本，使用清单中对应的版本化 `.tgz` 安装。
+
+维护者可运行 `npm run pack:dsh -- <产物目录>` 生成版本包、Windows ZIP 和更新渠道文件。将版本化 `.tgz` 与 `latest.tgz` 放到本仓库 GitHub Pages 的 `/dsh/` 后，再上传 `latest.json`。同一版本的版本化包应保持原样。
+
 ## 桌面版
 
 一个独立小窗口，支持 **Cursor、Claude Code、Codex、DS Bot（DeepSeek Harness）、WorkBuddy**。电脑上装了哪个，窗口里就出现哪个，点端口按钮切换。每个工具只显示它真正读得到的内容，读不到的部分不显示。
