@@ -1364,21 +1364,21 @@
     selectPort(portList.find((item) => item.id === saved) || portList[0])
   }
   const dshPanel = window.QUOTAPOT_DSH === true
-  if (dshPanel) {
-    const button = document.createElement('button')
-    button.type = 'button'
-    button.textContent = '检查更新'
-    button.addEventListener('click', async () => {
-      button.disabled = true
-      try { await checkUpdate(true) } finally { button.disabled = false }
-    })
-    $('frame-toggle').replaceChildren(button)
+  const checkButton = dshPanel ? document.createElement('button') : null
+  let installingUpdate = false
+  if (checkButton) {
+    checkButton.type = 'button'
+    checkButton.textContent = '检查更新'
+    checkButton.addEventListener('click', () => checkUpdate(true))
+    $('frame-toggle').replaceChildren(checkButton)
     $('update-go').textContent = '立即更新'
   }
   async function checkUpdate(manual = false) {
+    if (installingUpdate || checkButton?.disabled) return
+    if (checkButton) checkButton.disabled = true
     try {
       const info = await fetch('/api/update', { cache: 'no-store' }).then((response) => response.json())
-      if (!info.newer && !manual) return
+      if (installingUpdate || (!info.newer && !manual)) return
       $('update-text').textContent = info.newer
         ? `有新版本 v${info.latest}（当前 v${info.current}）`
         : info.ok ? `已是最新版本 v${info.current}` : info.error
@@ -1388,15 +1388,21 @@
         $('update-go').textContent = '立即更新'
       }
       $('update').hidden = false
+      if (dshPanel && !manual && info.newer) await installUpdate()
     } catch {
       if (!manual) return
       $('update-text').textContent = '检查更新失败'
       $('update-go').hidden = true
       $('update').hidden = false
+    } finally {
+      if (checkButton && !installingUpdate) checkButton.disabled = false
     }
   }
-  $('update-go').addEventListener('click', async () => {
+  async function installUpdate() {
+    if (installingUpdate) return
+    installingUpdate = true
     const button = $('update-go')
+    if (checkButton) checkButton.disabled = true
     button.disabled = true
     button.textContent = '更新中…'
     $('update-text').textContent = '正在下载并检查新版本，请不要关闭窗口'
@@ -1405,8 +1411,11 @@
       result = await fetch('/api/update/install', { method: 'POST' }).then((response) => response.json())
     } catch (error) {
       result = { ok: false, error: '更新失败：' + error.message }
+    } finally {
+      installingUpdate = false
+      if (checkButton) checkButton.disabled = false
     }
-    if (result.ok) {
+    if (result?.ok) {
       button.hidden = true
       if (dshPanel) {
         $('update-text').textContent = result.upToDate ? `已是最新版本 v${result.version}`
@@ -1419,11 +1428,12 @@
         : `已更新到 v${result.version}，正在重启…`
       return
     }
-    $('update-text').textContent = result.error || '更新失败'
+    $('update-text').textContent = result?.error || '更新失败'
     button.disabled = false
     button.textContent = '重试'
-  })
-  if (!dshPanel) checkUpdate()
+  }
+  $('update-go').addEventListener('click', installUpdate)
+  checkUpdate()
   loadPorts().then(() => {
     show(visibleTabs()[0])
     ensureContext()
