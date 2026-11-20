@@ -1,10 +1,10 @@
 {
   "name": "dsh-quotapot",
-  "version": "0.6.1",
-  "file": "https://caffrey-li.github.io/QuotaPot/dsh/dsh-quotapot-0.6.1.tgz",
+  "version": "0.6.2",
+  "file": "https://caffrey-li.github.io/QuotaPot/dsh/dsh-quotapot-0.6.2.tgz",
   "channel": "https://caffrey-li.github.io/QuotaPot/dsh/latest.tgz",
-  "tgz": "https://caffrey-li.github.io/QuotaPot/dsh/dsh-quotapot-0.6.1.tgz",
-  "sha256": "97882caaf3c13f25589efe7ab3b99defff88393fafd9f0e8cdd13284cb2e3f6f",
-  "size": 70928,
-  "releasedAt": "2026-11-20T02:27:26.769Z"
+  "tgz": "https://caffrey-li.github.io/QuotaPot/dsh/dsh-quotapot-0.6.2.tgz",
+  "sha256": "204ff6ead8f33e538b754c7020c839c32bcb2ad6c5d0eab56b330337cc22a7bf",
+  "size": 71341,
+  "releasedAt": "2026-11-20T05:52:44.044Z"
 }
