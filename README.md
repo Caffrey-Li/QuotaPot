@@ -10,11 +10,13 @@
 
 ### 安装
 
-- **Windows** 解压 [dsh-quotapot-0.6.0.zip](https://github.com/Caffrey-Li/QuotaPot/releases/download/dsh-v0.6.0/dsh-quotapot-0.6.0.zip) 到固定目录。在 DSH 的「设置 → 插件 → 新增插件」选择解压后的 `dsh-quotapot-0.6.0` 文件夹。
-- **macOS** 在同一入口选择 [dsh-quotapot-0.6.0.tgz](https://github.com/Caffrey-Li/QuotaPot/releases/download/dsh-v0.6.0/dsh-quotapot-0.6.0.tgz)，也可以选择解压后的文件夹。
+- **Windows** 解压 [dsh-quotapot-0.6.1.zip](https://caffrey-li.github.io/QuotaPot/dsh/dsh-quotapot-0.6.1.zip) 到固定目录。在 DSH 的「设置 → 插件 → 新增插件」选择解压后的 `dsh-quotapot-0.6.1` 文件夹。
+- **macOS** 在同一入口选择 [dsh-quotapot-0.6.1.tgz](https://caffrey-li.github.io/QuotaPot/dsh/dsh-quotapot-0.6.1.tgz)，也可以选择解压后的文件夹。
 - **固定地址** 在「新增插件」粘贴 `https://caffrey-li.github.io/QuotaPot/dsh/latest.tgz`。DSH 提示重启时，重启后再打开侧栏面板。
 
 ### 更新
+
+如果 `0.6.0` 在 DSH 插件管理页显示「异常」，请先从该页移除旧 QuotaPot 插件，再添加上面的 `0.6.1` 包并重启 DSH。
 
 打开侧栏的 QuotaPot，点击「检查更新」。出现新版本提示后点击「立即更新」，由 DSH 插件管理器安装。面板会提示是否需要重启 DSH。更新渠道使用 `latest.json` 检查版本，使用清单中对应的版本化 `.tgz` 安装。
 

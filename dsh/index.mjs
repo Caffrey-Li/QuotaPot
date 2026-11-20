@@ -37,36 +37,50 @@ export function apply(ctx) {
     applyUpdate: updater.install,
     describePorts,
   })
-  ctx.effect(() => ctx.connection.rpc.intercept('/api', (endpoint) => endpoint === ENDPOINT,
-    async (_endpoint, payload, _signal, peer) => {
-      if (peer.principal.kind !== 'owner') return failure('forbidden', '需要本机所有者权限')
-      const { method, url, body = '' } = payload ?? {}
-      if (typeof url !== 'string' || !url.startsWith('/api/') || url.length > 500 ||
-          typeof body !== 'string' || Buffer.byteLength(body) > 64_000) {
-        return failure('bad-request', '请求格式无效')
-      }
-      const { pathname } = new URL(url, 'http://localhost')
-      if (!permitted(method, pathname)) return failure('bad-request', '此操作在 DSH 面板中不可用')
+  async function dispatch(payload) {
+    const { method, url, body = '' } = payload ?? {}
+    if (typeof url !== 'string' || !url.startsWith('/api/') || url.length > 500 ||
+        typeof body !== 'string' || Buffer.byteLength(body) > 64_000) {
+      return failure('bad-request', '请求格式无效')
+    }
+    const { pathname } = new URL(url, 'http://localhost')
+    if (!permitted(method, pathname)) return failure('bad-request', '此操作在 DSH 面板中不可用')
 
-      const request = Object.assign(Readable.from(body ? [Buffer.from(body)] : []), { method, url: pathname === '/api/plugin-panel' ? '/' : url })
-      let status = 500
-      let headers = {}
-      const chunks = []
-      const response = {
-        headersSent: false,
-        writeHead(code, values = {}) {
-          status = code
-          headers = values
-          this.headersSent = true
-        },
-        write(chunk) { chunks.push(chunk) },
-        end(chunk) { if (chunk) chunks.push(chunk) },
+    const request = Object.assign(Readable.from(body ? [Buffer.from(body)] : []), { method, url: pathname === '/api/plugin-panel' ? '/' : url })
+    let status = 500
+    let headers = {}
+    const chunks = []
+    const response = {
+      headersSent: false,
+      writeHead(code, values = {}) {
+        status = code
+        headers = values
+        this.headersSent = true
+      },
+      write(chunk) { chunks.push(chunk) },
+      end(chunk) { if (chunk) chunks.push(chunk) },
+    }
+    await handle(request, response)
+    return { ok: true, value: {
+      status,
+      contentType: headers['content-type'] ?? 'text/plain',
+      body: chunks.join(''),
+    } }
+  }
+
+  // DSH's gateway owns the shared RPC interceptor. Exact Fetch routes use the same authenticated carrier.
+  ctx.effect(() => ctx.connection.fetch.register({
+    path: `/api/${ENDPOINT}`,
+    methods: ['POST'],
+    requestBody: 'buffered',
+    async fetch(request) {
+      const envelope = await request.json().catch(() => null)
+      if (envelope?.type !== 'client-request' || envelope.method !== ENDPOINT ||
+          typeof envelope.rpcId !== 'string') {
+        return new Response('Invalid RPC request', { status: 400 })
       }
-      await handle(request, response)
-      return { ok: true, value: {
-        status,
-        contentType: headers['content-type'] ?? 'text/plain',
-        body: chunks.join(''),
-      } }
-    }), 'QuotaPot panel RPC')
+      const result = await dispatch(envelope.payload)
+      return Response.json({ type: 'server-response', rpcId: envelope.rpcId, result })
+    },
+  }), 'QuotaPot panel RPC')
 }
