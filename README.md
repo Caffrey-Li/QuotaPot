@@ -8,15 +8,17 @@
 
 在 DSH 侧栏点击 **QuotaPot** 可打开对话、用量和空间面板。用量端口继续使用 QuotaPot 原有的数据源。DS Bot 的 token 统计来自 `DSH_HOME/bot/usage.sqlite`（默认 `~/.dsh/bot/usage.sqlite`）。DeepSeek API 余额需要可用的 API Key。插件使用 DSH 自带运行时和插件管理器。
 
+Windows 的「空间」页按文件大小汇总各工具目录，跳过目录链接。
+
 ### 安装
 
-- **Windows** 解压 [dsh-quotapot-0.6.1.zip](https://caffrey-li.github.io/QuotaPot/dsh/dsh-quotapot-0.6.1.zip) 到固定目录。在 DSH 的「设置 → 插件 → 新增插件」选择解压后的 `dsh-quotapot-0.6.1` 文件夹。
-- **macOS** 在同一入口选择 [dsh-quotapot-0.6.1.tgz](https://caffrey-li.github.io/QuotaPot/dsh/dsh-quotapot-0.6.1.tgz)，也可以选择解压后的文件夹。
+- **Windows** 解压 [dsh-quotapot-0.6.2.zip](https://caffrey-li.github.io/QuotaPot/dsh/dsh-quotapot-0.6.2.zip) 到固定目录。在 DSH 的「设置 → 插件 → 新增插件」选择解压后的 `dsh-quotapot-0.6.2` 文件夹。
+- **macOS** 在同一入口选择 [dsh-quotapot-0.6.2.tgz](https://caffrey-li.github.io/QuotaPot/dsh/dsh-quotapot-0.6.2.tgz)，也可以选择解压后的文件夹。
 - **固定地址** 在「新增插件」粘贴 `https://caffrey-li.github.io/QuotaPot/dsh/latest.tgz`。DSH 提示重启时，重启后再打开侧栏面板。
 
 ### 更新
 
-如果 `0.6.0` 在 DSH 插件管理页显示「异常」，请先从该页移除旧 QuotaPot 插件，再添加上面的 `0.6.1` 包并重启 DSH。
+如果 `0.6.0` 在 DSH 插件管理页显示「异常」，请先从该页移除旧 QuotaPot 插件，再添加上面的最新版安装包并重启 DSH。
 
 打开侧栏的 QuotaPot，点击「检查更新」。出现新版本提示后点击「立即更新」，由 DSH 插件管理器安装。面板会提示是否需要重启 DSH。更新渠道使用 `latest.json` 检查版本，使用清单中对应的版本化 `.tgz` 安装。
 

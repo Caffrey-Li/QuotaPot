@@ -578,6 +578,12 @@
     }
     $('free').textContent = Number.isFinite(disk.free) ? '可用 ' + bytes(disk.free) : ''
     const items = disk.items || []
+    if (items.length === 0) {
+      const empty = document.createElement('div')
+      empty.className = 'meta'
+      empty.textContent = '未找到可统计的 AI 工具目录'
+      list.append(empty)
+    }
     const byId = new Map(items.map((item) => [item.id, item]))
     const children = new Map()
     for (const item of items) {

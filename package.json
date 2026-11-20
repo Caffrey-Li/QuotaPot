@@ -1,6 +1,6 @@
 {
   "name": "dsh-quotapot",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "description": "QuotaPot 对话上下文、用量、额度与空间面板",
   "license": "MIT",
   "type": "module",

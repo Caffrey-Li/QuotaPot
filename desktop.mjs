@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { execFile, execFileSync, spawn, spawnSync } from 'node:child_process'
 import fs from 'node:fs'
-import { rm, stat, statfs } from 'node:fs/promises'
+import { lstat, readdir, rm, stat, statfs } from 'node:fs/promises'
 import http from 'node:http'
 import os from 'node:os'
 import path from 'node:path'
@@ -146,14 +146,46 @@ export async function scanDisk({ fresh = false } = {}) {
   return scanDiskProgress(() => {})
 }
 
-async function directorySize(targetPath) {
-  try {
-    const { stdout } = await execFileAsync('du', ['-sk', targetPath], { timeout: 30_000, maxBuffer: 1024 * 1024 })
-    const kb = Number.parseInt(String(stdout).split(/\s+/)[0], 10)
-    return Number.isFinite(kb) ? kb * 1024 : null
-  } catch {
-    return null
+async function directoryFileBytes(targetPath) {
+  const folders = [targetPath]
+  let bytes = 0
+  while (folders.length) {
+    const folder = folders.pop()
+    const info = await lstat(folder).catch(() => null)
+    const entries = info?.isDirectory()
+      ? await readdir(folder, { withFileTypes: true }).catch(() => null)
+      : null
+    if (!entries) {
+      if (folder === targetPath) return null
+      continue
+    }
+
+    // Bound outstanding metadata reads for large cache directories.
+    for (let start = 0; start < entries.length; start += 32) {
+      const sizes = await Promise.all(entries.slice(start, start + 32).map(async (entry) => {
+        const target = path.join(folder, entry.name)
+        if (entry.isDirectory()) folders.push(target)
+        if (!entry.isFile()) return 0
+        const file = await lstat(target).catch(() => null)
+        return file?.isFile() ? file.size : 0
+      }))
+      bytes += sizes.reduce((sum, size) => sum + size, 0)
+    }
   }
+  return bytes
+}
+
+async function directorySize(targetPath) {
+  if (process.platform !== 'win32') {
+    try {
+      const { stdout } = await execFileAsync('du', ['-sk', targetPath], { timeout: 30_000, maxBuffer: 1024 * 1024 })
+      const kb = Number.parseInt(String(stdout).split(/\s+/)[0], 10)
+      return Number.isFinite(kb) ? kb * 1024 : null
+    } catch (error) {
+      if (error.code !== 'ENOENT') return null
+    }
+  }
+  return directoryFileBytes(targetPath)
 }
 
 export async function scanDiskProgress(onProgress) {
